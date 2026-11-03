@@ -1,0 +1,3 @@
+#Check status 
+sudo systemctl status logstash
+sudo systemctl status filebeat
