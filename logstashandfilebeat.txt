@@ -138,8 +138,7 @@ sudo ls -l /var/lib/kibana/ca_1793410983415.crt
 
 
 Then:
-sudo openssl x509 \
-  -in /var/lib/kibana/ca_1793410983415.crt -noout -subject -issuer -dates
+sudo openssl x509 -in /var/lib/kibana/ca_1793410983415.crt -noout -subject -issuer -dates
 
 
 This checks that the certificate exists and displays its validity dates.
@@ -205,8 +204,7 @@ Step 3 — Verify Elasticsearch connectivity
 Since you already have Elasticsearch on es-node1, check whether it uses HTTPS.
 
 For the default secured installation:
-sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
-  -u elastic https://localhost:9200
+sudo curl --cacert /var/lib/kibana/ca_1793410983415.crt -u elastic https://192.168.122.227:9200
 
 Step 4 — Prepare HTTPS security (if using the HTTPS file)
 Copy the Elasticsearch CA certificate into a location accessible to Logstash:
