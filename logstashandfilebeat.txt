@@ -4,7 +4,10 @@ sudo systemctl status filebeat
 sudo systemctl is-active logstash filebeat
 
 #simple logstash test
-sudo /usr/share/logstash/bin/logstash \
+sudo mkdir -p /tmp/logstash-stdin-data
+sudo chown -R logstash:logstash /tmp/logstash-stdin-data
+sudo chmod 750 /tmp/logstash-stdin-data
+sudo -u logstash /usr/share/logstash/bin/logstash \
   --path.settings /etc/logstash \
   --path.data /tmp/logstash-stdin-data \
   --api.http.port 9601 \
