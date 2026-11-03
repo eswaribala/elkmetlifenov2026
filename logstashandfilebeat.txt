@@ -17,6 +17,8 @@ Step 1 — Create the log directory
 
 Step 2 — Create a simple log file
 Create app.log containing INFO, WARN, and ERROR messages.
+sudo nano /var/log/elastic-lab/app.log
+#add the following
   for i in $(seq 1 15); do
     echo "2026-11-03 10:00:00 INFO Application started request=$i"
     echo "2026-11-03 10:01:00 WARN Slow response request=$i"
