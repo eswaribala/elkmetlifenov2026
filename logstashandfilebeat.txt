@@ -235,5 +235,95 @@ sudo curl --cacert /var/lib/kibana/ca_1793410983415.crt -u elastic 'https://192.
 Step 8 — View the data in Kibana Discover
 Open Kibana → Discover, create a data view using:
 csv-stock-data
+=====================================
+exercise4 syslog to logstash to elastic
+
+Step 1 — Create a directory for the syslog lab
+On your Ubuntu es-node1 machine, where Logstash is installed:
+sudo mkdir -p /opt/elastic-lab/syslog
+
+
+Create a separate Logstash data directory:
+sudo install -d -o logstash -g logstash -m 750 /var/lib/logstash-syslog
+
+Step 3 — Create the syslog Logstash configuration
+Open:
+sudo nano /opt/elastic-lab/syslog/syslog.conf
+
+#copy conf
+
+input {
+  tcp {
+    host => "127.0.0.1"
+    port => 5514
+    type => "syslog"
+    tags => ["syslog_tcp"]
+    codec => line
+  }
+
+  udp {
+    host => "127.0.0.1"
+    port => 5514
+    type => "syslog"
+    tags => ["syslog_udp"]
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["https://192.168.122.227:9200"]
+    user => "elastic"
+    password => "${ES_PASSWORD}"
+
+    ssl_certificate_authorities => [
+      "/etc/logstash/certs/http_ca.crt"
+    ]
+
+    data_stream => "false"
+    index => "syslog-v1"
+    ilm_enabled => false
+  }
+
+  stdout {
+    codec => rubydebug
+  }
+}
+
+Set permissions:
+sudo chmod 644 /opt/elastic-lab/syslog/syslog.conf
+Step 4 — Set the Elasticsearch password
+Enter your Elasticsearch password securely:
+read -rsp "Elasticsearch password: " ES_PASSWORD
+echo
+Execute:
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" /usr/share/logstash/bin/logstash --path.settings /etc/logstash --path.data /var/lib/logstash-syslog --api.http.port 9601 -f /opt/elastic-lab/syslog/syslog.conf --config.test_and_exit
+
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" /usr/share/logstash/bin/logstash --path.settings /etc/logstash --path.data /var/lib/logstash-syslog --api.http.port 9601 -f /opt/elastic-lab/syslog/syslog.conf
+sudo ss -lntp | grep 5514
+sudo ss -lnup | grep 5514
+Step 8 — Exercise 1: Send UDP syslog messages
+In the second terminal:
+logger -d -n 127.0.0.1 -P 5514 --rfc3164 -t ubuntu-lab  "UDP syslog test: Application started"
+Send a warning:
+logger -d -n 127.0.0.1 -P 5514 --rfc3164 -p user.warning -t ubuntu-lab "UDP syslog warning: High memory usage"
+Send an error:
+logger -d -n 127.0.0.1 -P 5514 --rfc3164 -p user.err -t ubuntu-lab "UDP syslog error: Database connection failed"
+
+Step 9 — Exercise 2: Send TCP syslog messages
+In the second terminal, run:
+logger -T -n 127.0.0.1 -P 5514 --rfc3164 -t ubuntu-lab "TCP syslog test: User logged in"
+
+Step 10 — Verify Elasticsearch ingestion in Kibana
+Open your existing Kibana → Dev Tools → Console.
+
+First, check whether the index was created:
+GET _cat/indices/syslog-v1?v
+
+
+
+
+
+
+
 
 
