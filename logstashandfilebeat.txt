@@ -139,17 +139,13 @@ sudo ls -l /var/lib/kibana/ca_1793410983415.crt
 
 Then:
 sudo openssl x509 \
-  -in /var/lib/kibana/ca_1793410983415.crt \
-  -noout -subject -issuer -dates
+  -in /var/lib/kibana/ca_1793410983415.crt -noout -subject -issuer -dates
 
 
 This checks that the certificate exists and displays its validity dates.
 Step 2 — Test secure HTTPS connectivity
 Run:
-sudo curl \
-  --cacert /var/lib/kibana/ca_1793410983415.crt \
-  -u elastic \
-  https://192.168.122.227:9200
+sudo curl --cacert /var/lib/kibana/ca_1793410983415.crt -u elastic https://192.168.122.227:9200
 
 
 Enter the Elasticsearch password.
@@ -162,27 +158,6 @@ Expected response includes:
     "number": "9.5.5"
   }
 }
-
-
-Unlike curl -k, this verifies the CA certificate and endpoint identity.
-Step 3 — Verify TLS verification mode
-Your screenshot does not show an explicit elasticsearch.ssl.verificationMode setting.
-
-That is fine. Kibana's default is:
-elasticsearch.ssl.verificationMode: full
-
-
-It validates the certificate chain and hostname/IP identity. 
-Kibana
-
-Step 4 — Use the existing certificate for your Logstash CSV lab
-Since Kibana and Logstash are on es-node1, you can reuse this trusted CA certificate for the Logstash Elasticsearch output.
-sudo mkdir -p /etc/logstash/certs
-
-
-sudo install -o root -g logstash -m 640 \
-  /var/lib/kibana/ca_1793410983415.crt \
-  /etc/logstash/certs/http_ca.crt
 
 
 
