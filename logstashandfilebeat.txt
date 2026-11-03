@@ -129,6 +129,9 @@ sudo tail -n 10 /var/log/logstash/elastic-lab-received.log
 ==========================================================================
 exercise 3 logstash to elastic
 
+check kibana
+sudo grep -nE '^[[:space:]]*(elasticsearch.hosts|elasticsearch.ssl.certificateAuthorities|elasticsearch.ssl.verificationMode):' /etc/kibana/kibana.yml
+
 Step 1 — Download the corrected files
 I prepared the updated configuration and cleaned CSV for your Ubuntu lab.
 Cleaned CSV file
