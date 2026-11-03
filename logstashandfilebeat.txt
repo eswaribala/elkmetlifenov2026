@@ -47,7 +47,7 @@ Enable the Logstash output:
 output.logstash:
   hosts: ["127.0.0.1:5044"]
 
-sudo nano /etc/logstash/conf.d/elastic-lab.conf
+sudo nano /etc/logstash/conf.d/filebeat.conf
 
 input {
   beats {
