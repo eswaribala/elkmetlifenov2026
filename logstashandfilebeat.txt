@@ -2,6 +2,14 @@
 sudo systemctl status logstash
 sudo systemctl status filebeat
 sudo systemctl is-active logstash filebeat
+
+#simple logstash test
+sudo /usr/share/logstash/bin/logstash \
+  --path.settings /etc/logstash \
+  --path.data /tmp/logstash-stdin-data \
+  --api.http.port 9601 \
+  -e 'input { stdin {} } output { stdout { codec => rubydebug } }'
+
 Step 1 — Create the log directory
   Run on the Ubuntu machine where Filebeat is installed.
   sudo mkdir -p /var/log/elastic-lab
