@@ -100,6 +100,11 @@ sudo systemctl status filebeat
 Test connectivity to Logstash:
 sudo filebeat test output
 
+run new log
+for i in $(seq 1 10); do
+  echo "$(date '+%F %T') INFO Application request=$i"
+done | sudo tee -a /var/log/elastic-lab/app.log
+
 Step 7 — Verify logs received by Logstash
 On the Logstash server:
 sudo tail -f /var/log/logstash/elastic-lab-received.log
