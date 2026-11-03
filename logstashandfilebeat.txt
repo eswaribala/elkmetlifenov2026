@@ -13,6 +13,9 @@ sudo -u logstash /usr/share/logstash/bin/logstash \
   --api.http.port 9601 \
   -e 'input { stdin {} } output { stdout { codec => rubydebug } }'
 
+#start typing
+Hello logstash or any message
+
 Step 1 — Create the log directory
   Run on the Ubuntu machine where Filebeat is installed.
   sudo mkdir -p /var/log/elastic-lab
