@@ -1,3 +1,100 @@
 #Check status 
 sudo systemctl status logstash
 sudo systemctl status filebeat
+sudo systemctl is-active logstash filebeat
+Step 1 — Create the log directory
+  Run on the Ubuntu machine where Filebeat is installed.
+  sudo mkdir -p /var/log/elastic-lab
+  sudo chmod 755 /var/log/elastic-lab
+
+Step 2 — Create a simple log file
+Create app.log containing INFO, WARN, and ERROR messages.
+  for i in $(seq 1 15); do
+    echo "2026-11-03 10:00:00 INFO Application started request=$i"
+    echo "2026-11-03 10:01:00 WARN Slow response request=$i"
+    echo "2026-11-03 10:02:00 ERROR Database connection failed request=$i"
+  done | sudo tee /var/log/elastic-lab/app.log > /dev/null
+
+Set read permissions:
+sudo chmod 644 /var/log/elastic-lab/app.log
+
+Verify:
+cat /var/log/elastic-lab/app.log
+
+Step 3 — Configure Filebeat
+Open:
+sudo nano /etc/filebeat/filebeat.yml
+
+Find the existing filebeat.inputs section and configure it as follows:
+filebeat.inputs:
+  - type: filestream
+    id: elastic-lab
+    enabled: true
+    paths:
+      - /var/log/elastic-lab/*.log
+
+Enable the Logstash output:
+output.logstash:
+  hosts: ["127.0.0.1:5044"]
+
+sudo nano /etc/logstash/conf.d/elastic-lab.conf
+
+input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+}
+
+output {
+  stdout {
+    codec => rubydebug
+  }
+
+  file {
+    path => "/var/log/logstash/elastic-lab-received.log"
+    codec => line {
+      format => "%{message}"
+    }
+  }
+}
+
+Step 5 — Test and start Logstash
+Validate the pipeline:
+sudo /usr/share/logstash/bin/logstash  --path.settings /etc/logstash -t
+Restart Logstash:
+sudo systemctl restart logstash
+
+
+Check status:
+sudo systemctl status logstash
+
+Step 6 — Start Filebeat
+Return to the Filebeat machine.
+
+Validate its configuration:
+sudo filebeat test config -e
+
+sudo systemctl restart filebeat
+
+
+Check status:
+sudo systemctl status filebeat
+
+Test connectivity to Logstash:
+sudo filebeat test output -e
+
+Step 7 — Verify logs received by Logstash
+On the Logstash server:
+sudo tail -f /var/log/logstash/elastic-lab-received.log
+
+Step 8 — Test real-time ingestion
+On the Filebeat server, append a new log entry:
+echo "$(date '+%F %T') ERROR Payment failed" \
+  | sudo tee -a /var/log/elastic-lab/app.log
+
+On the Logstash server, check again:
+sudo tail -n 10 /var/log/logstash/elastic-lab-received.log
+
