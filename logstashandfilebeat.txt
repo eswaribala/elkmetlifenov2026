@@ -221,29 +221,16 @@ read -rsp "Elasticsearch password: " ES_PASSWORD
 echo
 
 Validate:
-sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" \
-  /usr/share/logstash/bin/logstash \
-  --path.settings /etc/logstash \
-  --path.data /var/lib/logstash-csv \
-  --api.http.port 9601 \
-  -f /opt/elastic-lab/csv/tmax11.conf \
-  --config.test_and_exit
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" /usr/share/logstash/bin/logstash --path.settings /etc/logstash  --path.data /var/lib/logstash-csv --api.http.port 9601 -f /opt/elastic-lab/csv/tmax11.conf --config.test_and_exit
 
 Now execute the pipeline by removing --config.test_and_exit:
-sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" \
-  /usr/share/logstash/bin/logstash \
-  --path.settings /etc/logstash \
-  --path.data /var/lib/logstash-csv \
-  --api.http.port 9601 \
-  -f /opt/elastic-lab/csv/tmax11.conf
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" /usr/share/logstash/bin/logstash --path.settings /etc/logstash --path.data /var/lib/logstash-csv --api.http.port 9601 -f /opt/elastic-lab/csv/tmax11.conf
 
 Step 7 — Verify documents in Elasticsearch
 Open another Ubuntu terminal.
 
 For HTTPS:
-sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
-  -u elastic \
-  'https://localhost:9200/csv-stock-data/_count?pretty'
+sudo curl --cacert /var/lib/kibana/ca_1793410983415.crt -u elastic 'https://192.168.122.227:9200/csv-stock-data/_count?pretty'
 
 Step 8 — View the data in Kibana Discover
 Open Kibana → Discover, create a data view using:
