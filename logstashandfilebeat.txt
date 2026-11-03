@@ -318,6 +318,147 @@ Open your existing Kibana → Dev Tools → Console.
 
 First, check whether the index was created:
 GET _cat/indices/syslog-v1?v
+===============================
+exercise 4 API to logstash to elastic
+
+Step 1 — Verify that Ubuntu can reach the API
+On es-node1 (your Logstash machine), run:
+curl -I https://jsonplaceholder.typicode.com/users
+
+
+Expected HTTP status:
+HTTP/2 200
+
+
+You can also view the JSON:
+curl -sS https://jsonplaceholder.typicode.com/users
+
+Step 2 — Check the HTTP Poller plugin
+Run:
+sudo /usr/share/logstash/bin/logstash-plugin list --verbose | grep logstash-input-http_poller
+
+
+If you see logstash-input-http_poller, it is installed.
+
+If not, install it:
+sudo /usr/share/logstash/bin/logstash-plugin install logstash-input-http_poller
+
+Step 4 — Create a directory for the HTTP Poller exercise
+sudo mkdir -p /opt/elastic-lab/http-poller
+
+
+Create a dedicated Logstash data directory:
+sudo install -d -o logstash -g logstash -m 750 \
+  /var/lib/logstash-http-poller
+
+Step 5 — Create http-poller.conf
+Open Nano:
+sudo nano /opt/elastic-lab/http-poller/http-poller.conf
+
+
+input {
+  http_poller {
+    urls => {
+      nasa => "https://jsonplaceholder.typicode.com/users"
+    }
+
+    schedule => {
+      every => "10s"
+    }
+
+    request_timeout => 30
+    codec => "json"
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["https://192.168.122.227:9200"]
+
+    data_stream => "false"
+
+    user => "elastic"
+    password => "${ES_PASSWORD}"
+
+    ssl_certificate_authorities => [
+      "/etc/logstash/certs/http_ca.crt"
+    ]
+
+    index => "users-v1"
+    document_id => "%{id}"
+    ilm_enabled => false
+  }
+
+  stdout {
+    codec => rubydebug
+  }
+}
+
+Set readable permissions:
+sudo chmod 644 /opt/elastic-lab/http-poller/http-poller.conf
+Step 6 — Enter your Elasticsearch password
+In the same Ubuntu terminal:
+read -rsp "Elasticsearch password: " ES_PASSWORD
+echo
+
+Step 7 — Validate the Logstash configuration
+Run:
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" /usr/share/logstash/bin/logstash  --path.settings /etc/logstash --path.data /var/lib/logstash-http-poller --api.http.port 9602 -f /opt/elastic-lab/http-poller/http-poller.conf --config.test_and_exit
+
+
+execute pipeline
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" /usr/share/logstash/bin/logstash  --path.settings /etc/logstash --path.data /var/lib/logstash-http-poller --api.http.port 9602 -f /opt/elastic-lab/http-poller/http-poller.conf 
+
+Step 9 — Verify data in Elasticsearch
+Open your existing Kibana browser:
+
+http://localhost:5601
+
+Navigate to Dev Tools → Console.
+Query 1 — Check the index
+GET _cat/indices/users-v1?v
+
+Step 10 — Execute search exercises in Kibana
+Exercise 1 — Search for a user by ID
+GET users-v1/_search
+{
+  "query": {
+    "term": {
+      "id": 1
+    }
+  }
+}
+
+Exercise 2 — Display names and email addresses
+GET users-v1/_search
+{
+  "_source": ["id", "name", "email"],
+  "size": 10
+}
+
+Exercise 3 — Find users with a Gmail address
+GET users-v1/_search
+{
+  "query": {
+    "match": {
+      "email": "gmail.com"
+    }
+  }
+}
+
+Exercise 4 — Group users by company
+GET users-v1/_search
+{
+  "size": 0,
+  "aggs": {
+    "by_company": {
+      "terms": {
+        "field": "company.name.keyword",
+        "size": 20
+      }
+    }
+  }
+}
 
 
 
