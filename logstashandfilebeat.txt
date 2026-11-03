@@ -73,6 +73,9 @@ output {
 
 Step 5 — Test and start Logstash
 Validate the pipeline:
+sudo chown -R logstash:logstash /var/log/logstash
+sudo chmod 750 /var/log/logstash
+
 sudo -u logstash /usr/share/logstash/bin/logstash --path.settings /etc/logstash -t
 Restart Logstash:
 sudo systemctl restart logstash
