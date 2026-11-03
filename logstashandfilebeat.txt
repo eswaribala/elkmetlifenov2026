@@ -128,3 +128,95 @@ On the Logstash server, check again:
 sudo tail -n 10 /var/log/logstash/elastic-lab-received.log
 ==========================================================================
 exercise 3 logstash to elastic
+
+Step 1 — Download the corrected files
+I prepared the updated configuration and cleaned CSV for your Ubuntu lab.
+Cleaned CSV file
+
+10 records, Ubuntu-compatible line endings
+
+tmax11_ubuntu.csv
+
+Recommended: HTTPS configuration
+
+For Elasticsearch with TLS and authentication enabled
+
+tmax11_ubuntu_https.conf
+
+Alternative: HTTP configuration
+
+Only for Elasticsearch configured without authentication or TLS
+
+tmax11_ubuntu_http.conf
+
+Step 2 — Create the CSV lab directory
+On es-node1:
+sudo mkdir -p /opt/elastic-lab/csv
+
+
+Copy your downloaded CSV:
+sudo cp ~/Downloads/tmax11_ubuntu.csv /opt/elastic-lab/csv/tmax11.csv
+
+For the usual secured Elasticsearch installation, copy the HTTPS configuration:
+sudo cp ~/Downloads/tmax11_ubuntu_https.conf /opt/elastic-lab/csv/tmax11.conf
+
+Set permissions:
+sudo chmod 755 /opt/elastic-lab /opt/elastic-lab/csv
+sudo chmod 644 /opt/elastic-lab/csv/tmax11.*
+
+Verify:
+cat /opt/elastic-lab/csv/tmax11.csv
+wc -l /opt/elastic-lab/csv/tmax11.csv
+
+Step 3 — Verify Elasticsearch connectivity
+Since you already have Elasticsearch on es-node1, check whether it uses HTTPS.
+
+For the default secured installation:
+sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
+  -u elastic https://localhost:9200
+
+Step 4 — Prepare HTTPS security (if using the HTTPS file)
+Copy the Elasticsearch CA certificate into a location accessible to Logstash:
+sudo mkdir -p /etc/logstash/certs
+sudo install -m 644 /etc/elasticsearch/certs/http_ca.crt \
+  /etc/logstash/certs/http_ca.crt
+
+Step 5 — Create a separate Logstash data directory
+This avoids conflicts with your running Filebeat → Logstash service.
+sudo install -d -o logstash -g logstash -m 750 /var/lib/logstash-csv
+
+Step 6 — Execute the CSV pipeline
+For the HTTPS configuration, first enter your Elasticsearch password without displaying it:
+read -rsp "Elasticsearch password: " ES_PASSWORD
+echo
+
+Validate:
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" \
+  /usr/share/logstash/bin/logstash \
+  --path.settings /etc/logstash \
+  --path.data /var/lib/logstash-csv \
+  --api.http.port 9601 \
+  -f /opt/elastic-lab/csv/tmax11.conf \
+  --config.test_and_exit
+
+Now execute the pipeline by removing --config.test_and_exit:
+sudo -u logstash env ES_PASSWORD="$ES_PASSWORD" \
+  /usr/share/logstash/bin/logstash \
+  --path.settings /etc/logstash \
+  --path.data /var/lib/logstash-csv \
+  --api.http.port 9601 \
+  -f /opt/elastic-lab/csv/tmax11.conf
+
+Step 7 — Verify documents in Elasticsearch
+Open another Ubuntu terminal.
+
+For HTTPS:
+sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
+  -u elastic \
+  'https://localhost:9200/csv-stock-data/_count?pretty'
+
+Step 8 — View the data in Kibana Discover
+Open Kibana → Discover, create a data view using:
+csv-stock-data
+
+
