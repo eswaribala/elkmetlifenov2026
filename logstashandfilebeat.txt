@@ -19,11 +19,11 @@ Step 2 — Create a simple log file
 Create app.log containing INFO, WARN, and ERROR messages.
 sudo nano /var/log/elastic-lab/app.log
 #add the following
-  for i in $(seq 1 15); do
-    echo "2026-11-03 10:00:00 INFO Application started request=$i"
-    echo "2026-11-03 10:01:00 WARN Slow response request=$i"
-    echo "2026-11-03 10:02:00 ERROR Database connection failed request=$i"
-  done | sudo tee /var/log/elastic-lab/app.log > /dev/null
+2026-11-03 10:00:00 INFO Application started
+2026-11-03 10:01:00 WARN Memory usage high
+2026-11-03 10:02:00 ERROR Database connection failed
+2026-11-03 10:03:00 INFO User login successful
+2026-11-03 10:04:00 ERROR Payment failed
 
 Set read permissions:
 sudo chmod 644 /var/log/elastic-lab/app.log
