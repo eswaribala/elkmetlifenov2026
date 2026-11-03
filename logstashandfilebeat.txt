@@ -2,6 +2,8 @@
 sudo systemctl status logstash
 sudo systemctl status filebeat
 sudo systemctl is-active logstash filebeat
+==============================
+exercise 1
 
 #simple logstash test
 sudo mkdir -p /tmp/logstash-stdin-data
@@ -15,6 +17,8 @@ sudo -u logstash /usr/share/logstash/bin/logstash \
 
 #start typing
 Hello logstash or any message
+================================================================
+Exercise 2 file beat to logstash
 
 Step 1 — Create the log directory
   Run on the Ubuntu machine where Filebeat is installed.
@@ -122,4 +126,5 @@ echo "$(date '+%F %T') ERROR Payment failed" \
 
 On the Logstash server, check again:
 sudo tail -n 10 /var/log/logstash/elastic-lab-received.log
-
+==========================================================================
+exercise 3 logstash to elastic
