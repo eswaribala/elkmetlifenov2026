@@ -89,7 +89,7 @@ Step 6 — Start Filebeat
 Return to the Filebeat machine.
 
 Validate its configuration:
-sudo filebeat test config -e
+sudo filebeat test config
 
 sudo systemctl restart filebeat
 
@@ -98,7 +98,7 @@ Check status:
 sudo systemctl status filebeat
 
 Test connectivity to Logstash:
-sudo filebeat test output -e
+sudo filebeat test output
 
 Step 7 — Verify logs received by Logstash
 On the Logstash server:
