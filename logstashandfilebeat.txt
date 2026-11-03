@@ -209,8 +209,7 @@ sudo curl --cacert /var/lib/kibana/ca_1793410983415.crt -u elastic https://192.1
 Step 4 — Prepare HTTPS security (if using the HTTPS file)
 Copy the Elasticsearch CA certificate into a location accessible to Logstash:
 sudo mkdir -p /etc/logstash/certs
-sudo install -m 644 /etc/elasticsearch/certs/http_ca.crt \
-  /etc/logstash/certs/http_ca.crt
+sudo install -o root -g logstash -m 640   /var/lib/kibana/ca_1793410983415.crt  /etc/logstash/certs/http_ca.crt
 
 Step 5 — Create a separate Logstash data directory
 This avoids conflicts with your running Filebeat → Logstash service.
