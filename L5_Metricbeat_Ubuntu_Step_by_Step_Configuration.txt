@@ -224,6 +224,7 @@ STEP 3.6 - Secure YAML file permissions.
     /etc/metricbeat/modules.d/elasticsearch-xpack.yml
 
 Passwords remain in the Metricbeat keystore, NOT in the YAML.
+sudo curl -I --cacert /etc/elasticsearch/certs/http_ca.crt https://localhost:9200
 
 STEP 3.7 - Test before starting.
   sudo metricbeat test config -e
