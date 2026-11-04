@@ -1,0 +1,512 @@
+L5.7 - METRICBEAT CONFIGURATION: UBUNTU / SELF-MANAGED ELASTIC STACK
+Step-by-step hands-on lab | Plain text | 04 November 2026
+======================================================================
+
+LAB TOPOLOGY (FROM YOUR L5/L6 LAB MANUAL; VERIFY LIVE ADDRESSES)
+----------------------------------------------------------------
+Elasticsearch node01: 192.168.122.227:9200  HTTPS
+Elasticsearch node02: 192.168.122.246:9200  HTTPS
+Elasticsearch node03: 192.168.122.102:9200  HTTPS
+Kibana:               192.168.1.162:5601
+Fleet Server:         rps1, separate host/role (not needed for standalone Metricbeat)
+Target machine:       Install Metricbeat on node03 first.
+Operating system:     Ubuntu VM, x86_64 assumed (verify).
+Elastic version:      Your course manual refers to 9.5.6. Verify the actual
+                      Elasticsearch version and available Metricbeat package.
+
+WHAT YOU ARE SETTING UP
+-----------------------
+There are TWO independent use cases. Choose the one your lab needs:
+
+MODE B (RECOMMENDED FOR L5.7 / EVIDENCE E4):
+  Metricbeat Elasticsearch X-Pack module -> Elasticsearch monitoring data
+  -> Kibana > Stack Monitoring. Install on each ES node for full node coverage.
+
+MODE A (OPTIONAL, FOR HOST CPU / MEMORY PRACTICE):
+  Metricbeat System module -> metricbeat-* -> Kibana > Discover.
+
+IMPORTANT DISTINCTIONS:
+* Your L5.4 System integration is Fleet-managed Elastic Agent. Its CPU data
+  stream is metrics-system.cpu-default (or another namespace).
+* Standalone Metricbeat System module ordinarily writes to metricbeat-*.
+* Metricbeat Elasticsearch X-Pack module feeds Stack Monitoring; it is not
+  the same as a normal host CPU document in metrics-system.cpu-*.
+* Your already working Fleet System integration is enough for L5.4 E2.
+  Do not install Metricbeat just to duplicate those host metrics.
+* Use MODE B to satisfy the optional Metricbeat alternative in L5.7 E4.
+* The examples below assume an isolated training cluster. In production,
+  prefer a dedicated monitoring cluster and appropriate architecture.
+* Do not run the same Elasticsearch Stack Monitoring collector twice via
+  both Elastic Agent and Metricbeat unless duplication is intentional.
+
+======================================================================
+PART 1 - READINESS CHECKS (RUN ON NODE03, UNLESS NOTED)
+======================================================================
+
+STEP 1.1 - Login to node03 and verify operating system/hostname.
+  hostname
+  hostname -I
+  uname -m
+  cat /etc/os-release
+  date -u
+  timedatectl status
+
+Expected: Ubuntu, x86_64 if using an x86_64 package; record the real hostname.
+
+STEP 1.2 - Check for an existing Metricbeat service before installing.
+  command -v metricbeat || true
+  dpkg -l metricbeat 2>/dev/null || true
+  sudo systemctl status metricbeat --no-pager || true
+
+Do not blindly reinstall or overwrite an existing working configuration.
+If already installed, back up the config and go to Part 2.
+
+STEP 1.3 - Verify Elasticsearch on node03 is healthy/reachable.
+  sudo systemctl status elasticsearch --no-pager
+  sudo ss -lntp | grep ':9200' || true
+  sudo ls -l /etc/elasticsearch/certs/http_ca.crt
+  curl -I --cacert /etc/elasticsearch/certs/http_ca.crt \
+    https://localhost:9200
+
+A 401 response means HTTPS connectivity works but authentication is needed.
+If TLS hostname verification fails, use a server name/IP covered by the
+certificate's Subject Alternative Names; do not permanently use -k.
+For debugging SANs (inspect, do not alter certificates):
+  echo | openssl s_client -connect localhost:9200 -servername localhost \
+    2>/dev/null | openssl x509 -noout -ext subjectAltName
+
+STEP 1.4 - Verify cluster version from Kibana > Dev Tools > Console.
+  GET /
+  GET _cluster/health
+  GET _nodes/http?filter_path=nodes.*.name,nodes.*.http.publish_address
+
+Verify actual Elasticsearch version. Prefer a compatible Metricbeat 9.x
+package close to / matching your cluster's version. Do not assume the
+specific 9.5.6 package exists until APT lists it.
+
+======================================================================
+PART 2 - INSTALL METRICBEAT ON UBUNTU NODE03
+======================================================================
+
+STEP 2.1 - If Elastic 9.x APT repository ALREADY exists, skip adding it.
+  grep -R 'artifacts.elastic.co/packages/9.x/apt' \
+    /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true
+  apt-cache policy metricbeat
+
+STEP 2.2 - If NO 9.x repository exists, install the official repository.
+  sudo apt-get update
+  sudo apt-get install -y ca-certificates curl wget gnupg apt-transport-https
+  wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
+    sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+  echo 'deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/9.x/apt stable main' | \
+    sudo tee /etc/apt/sources.list.d/elastic-9.x.list
+
+NOTE: Do NOT add a duplicate repository if it already exists. Check package
+signature/repository origin as appropriate in your training environment.
+
+STEP 2.3 - Install and verify version.
+  sudo apt-get update
+  apt-cache policy metricbeat
+  apt-cache madison metricbeat
+  sudo apt-get install -y metricbeat
+  metricbeat version
+  sudo systemctl status metricbeat --no-pager || true
+
+If your package is not suitable for the cluster, select an available
+compatible version instead of blindly mixing major versions.
+
+STEP 2.4 - Back up the initial configuration.
+  sudo cp -a /etc/metricbeat/metricbeat.yml \
+    /etc/metricbeat/metricbeat.yml.before-l5
+  sudo ls /etc/metricbeat/modules.d | head
+
+STEP 2.5 - Copy the local Elasticsearch CA into Metricbeat's config tree.
+  sudo mkdir -p /etc/metricbeat/certs
+  sudo install -m 0644 /etc/elasticsearch/certs/http_ca.crt \
+    /etc/metricbeat/certs/http_ca.crt
+  sudo ls -l /etc/metricbeat/certs/http_ca.crt
+
+If node03 uses a different CA from the output host, copy the correct output
+CA and configure BOTH certificates as appropriate. CA = public trust
+certificate, not the private server key. Do not copy http.p12 or private keys.
+
+======================================================================
+PART 3 - MODE B: ELASTICSEARCH X-PACK STACK MONITORING (L5.7 / E4)
+======================================================================
+
+STEP 3.1 - Create TWO restricted Elasticsearch users in Kibana.
+Kibana > Stack Management > Security > Users / Roles
+
+USER 1: mb_monitor_collector
+  Assign BUILT-IN ROLE: remote_monitoring_collector
+  Purpose: read ES monitoring data from node03.
+
+USER 2: mb_monitor_writer
+  Assign BUILT-IN ROLE: remote_monitoring_agent
+  Purpose: publish monitoring records to the monitoring cluster.
+
+Use distinct strong passwords. In this small lab, both users may be created
+in your existing ES cluster. Production should use the appropriate source
+and dedicated monitoring cluster identities. Do not publish with the elastic
+superuser as a long-term setup.
+
+STEP 3.2 - Create Metricbeat secure settings (ON NODE03).
+  sudo metricbeat keystore create
+  sudo metricbeat keystore add MB_MONITOR_COLLECTOR_PWD
+  sudo metricbeat keystore add MB_MONITOR_WRITER_PWD
+  sudo metricbeat keystore list
+
+Enter each password when prompted; no password should appear in the command.
+The Metricbeat service normally runs as root on Debian packages, so create
+this keystore with sudo. The keystore is NOT the Elasticsearch keystore.
+
+STEP 3.3 - Replace /etc/metricbeat/metricbeat.yml with this MODE B content.
+Before editing, preserve your backup from Step 2.4.
+  sudo nano /etc/metricbeat/metricbeat.yml
+
+PASTE ONLY THE FOLLOWING YAML (not the dashed separator lines):
+
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+output.elasticsearch:
+  hosts: ["https://localhost:9200"]
+  username: "mb_monitor_writer"
+  password: "${MB_MONITOR_WRITER_PWD}"
+  ssl.certificate_authorities: ["/etc/metricbeat/certs/http_ca.crt"]
+
+logging.level: info
+
+END OF YAML.
+
+IMPORTANT: The output host above is node03's local HTTPS Elasticsearch
+listener, which belongs to the same three-node training cluster. If you
+choose node01 or a separate monitoring cluster, replace the URL and CA;
+check reachability and certificate SAN from node03 first.
+
+STEP 3.4 - Enable the Elasticsearch X-Pack module.
+  sudo metricbeat modules disable elasticsearch || true
+  sudo metricbeat modules disable system || true
+  sudo metricbeat modules enable elasticsearch-xpack
+  sudo metricbeat modules list
+
+The System module is deliberately disabled here to avoid permission errors
+or duplicate host metrics. Stack Monitoring uses the X-Pack module, not the
+regular system CPU metricset.
+
+STEP 3.5 - Edit the X-Pack module (ON NODE03).
+  sudo nano /etc/metricbeat/modules.d/elasticsearch-xpack.yml
+
+REPLACE WITH:
+
+- module: elasticsearch
+  xpack.enabled: true
+  period: 10s
+  hosts: ["https://localhost:9200"]
+  scope: node
+  username: "mb_monitor_collector"
+  password: "${MB_MONITOR_COLLECTOR_PWD}"
+  ssl.certificate_authorities: ["/etc/metricbeat/certs/http_ca.crt"]
+
+END OF YAML.
+
+Scope=node means each Metricbeat collects its own Elasticsearch node.
+Do NOT set hosts to all three nodes in every Metricbeat installation with
+node scope, or you risk redundant monitoring data.
+Dedicated master-node clusters generally need a different scope design:
+consult Elastic's scope=cluster guidance; do not blindly repeat this pattern.
+
+STEP 3.6 - Secure YAML file permissions.
+  sudo chown root:root /etc/metricbeat/metricbeat.yml \
+    /etc/metricbeat/modules.d/elasticsearch-xpack.yml
+  sudo chmod 0644 /etc/metricbeat/metricbeat.yml \
+    /etc/metricbeat/modules.d/elasticsearch-xpack.yml
+
+Passwords remain in the Metricbeat keystore, NOT in the YAML.
+
+STEP 3.7 - Test before starting.
+  sudo metricbeat test config -e
+  sudo metricbeat test output -e
+  sudo metricbeat test modules elasticsearch -e
+
+Expected config: OK. The output test should connect to the Elasticsearch
+cluster; module test should show collected Elasticsearch monitoring data.
+If a test fails, see troubleshooting in Part 6 before proceeding.
+
+STEP 3.8 - Start service and review logs.
+  sudo systemctl enable --now metricbeat
+  sudo systemctl restart metricbeat
+  sudo systemctl status metricbeat --no-pager
+  sudo journalctl -u metricbeat --since '10 minutes ago' --no-pager
+
+STEP 3.9 - Kibana: inspect monitoring data.
+  Kibana > Stack Monitoring > Elasticsearch > Nodes
+  Set the time range to Last 30 minutes.
+  Confirm node03 node metrics (CPU/JVM/indexing/disk as supported).
+
+If prompted that monitoring collection is disabled, follow the authorized
+UI guidance. For lab diagnosis in Dev Tools:
+  GET _cluster/settings?include_defaults=true
+
+Only if required and you have approval, the documented cluster setting is:
+  PUT _cluster/settings
+  {
+    "persistent": {"xpack.monitoring.collection.enabled": true}
+  }
+
+This is a CLUSTER-WIDE persistent change, not a local Metricbeat setting.
+If the feature is already enabled and metrics show normally, do not change it.
+
+STEP 3.10 - Optional Elasticsearch monitoring-index diagnostics.
+  GET _cat/indices/.monitoring*?v&expand_wildcards=all
+  GET _data_stream/.monitoring*?expand_wildcards=all
+
+Monitoring index names/storage format may differ by Stack version.
+Trust the Stack Monitoring UI and actual module/service logs rather than
+assuming a fixed .monitoring-* index exists immediately.
+
+STEP 3.11 - Expand to all three nodes ONLY after node03 works.
+  On node01: install Metricbeat; repeat CA, keystore, config and X-Pack module.
+  On node02: install Metricbeat; repeat CA, keystore, config and X-Pack module.
+  On each: hosts ["https://localhost:9200"], scope: node (local instance).
+  Confirm node01, node02, node03 in Kibana > Stack Monitoring.
+
+IMPORTANT: One Metricbeat on node03 demonstrates PARTIAL node monitoring,
+not complete cluster node coverage. Take E4 screenshot with this limitation
+clearly stated when only node03 is instrumented.
+
+======================================================================
+PART 4 - MODE A: OPTIONAL HOST CPU / MEMORY WITH METRICBEAT SYSTEM MODULE
+======================================================================
+
+Only perform this MODE A if you explicitly need standalone Metricbeat host
+metrics. Do not run MODE A steps over a working MODE B setup without taking
+a backup and understanding that you will switch from E4 to host collection.
+Your existing Fleet System integration already collects L5.4 CPU metrics.
+
+STEP 4.1 - Create publishing role and user in Kibana.
+  Stack Management > Security > Roles > Create role
+    Role name: metricbeat_writer
+    Cluster privileges: monitor
+    Index privileges for metricbeat-* : create_doc, auto_configure
+    If required for your ILM setup: read_ilm
+  Create user: mb_host_writer
+    Assign role: metricbeat_writer
+
+The role is for normal metricbeat-* events, not .monitoring* X-Pack events.
+Setup assets require MORE privileges than routine publishing; perform
+setup using an authorized temporary setup/admin identity.
+
+STEP 4.2 - Add a separate secret for the normal host metric writer.
+  sudo metricbeat keystore add MB_HOST_WRITER_PWD
+
+STEP 4.3 - Stop the service while switching mode; back up current YAML.
+  sudo systemctl stop metricbeat
+  sudo cp -a /etc/metricbeat/metricbeat.yml \
+    /etc/metricbeat/metricbeat.yml.before-mode-a
+  sudo metricbeat modules disable elasticsearch-xpack || true
+  sudo metricbeat modules enable system
+
+STEP 4.4 - Edit main config for MODE A.
+  sudo nano /etc/metricbeat/metricbeat.yml
+
+PASTE:
+
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+output.elasticsearch:
+  hosts: ["https://localhost:9200"]
+  username: "mb_host_writer"
+  password: "${MB_HOST_WRITER_PWD}"
+  ssl.certificate_authorities: ["/etc/metricbeat/certs/http_ca.crt"]
+
+setup.kibana:
+  host: "http://192.168.1.162:5601"
+
+logging.level: info
+
+END OF YAML.
+
+STEP 4.5 - Set explicit CPU, memory, load, disk, network metricsets.
+  sudo nano /etc/metricbeat/modules.d/system.yml
+
+PASTE:
+
+- module: system
+  period: 10s
+  metricsets:
+    - cpu
+    - load
+    - memory
+    - filesystem
+    - fsstat
+    - network
+    - uptime
+    - process_summary
+  cpu.metrics: [percentages, normalized_percentages]
+
+END OF YAML.
+
+Normalized CPU percentage field: system.cpu.total.norm.pct
+Host RAM metric field: system.memory.actual.used.pct
+
+STEP 4.6 - Load assets ONCE with authorized setup credentials.
+The writer role above is deliberately insufficient for loading all setup
+assets. Ask your trainer/admin for temporary authorized setup credentials.
+Store the temporary password in the keystore (do not put it on the command
+line or in chat/screenshots):
+  sudo metricbeat keystore add MB_SETUP_PWD
+
+For a SMALL ISOLATED TRAINING CLUSTER, if you are authorized to use the
+built-in elastic user for the ONE-TIME setup, run:
+  sudo metricbeat setup -e \
+    -E output.elasticsearch.username=elastic \
+    -E 'output.elasticsearch.password=${MB_SETUP_PWD}' \
+    -E setup.kibana.username=elastic \
+    -E 'setup.kibana.password=${MB_SETUP_PWD}'
+
+The setup command can install templates/ILM assets and dashboards in the
+cluster. On shared infrastructure, use a dedicated setup user and review
+changes before running. Remove the setup secret afterwards:
+  sudo metricbeat keystore remove MB_SETUP_PWD
+
+If your setup user is not named elastic, replace BOTH occurrences of elastic
+in the command with that identity's username.
+
+STEP 4.7 - Test/start MODE A.
+  sudo metricbeat test config -e
+  sudo metricbeat test output -e
+  sudo metricbeat test modules system -e
+  sudo systemctl enable --now metricbeat
+  sudo systemctl status metricbeat --no-pager
+  sudo journalctl -u metricbeat -n 50 --no-pager
+
+STEP 4.8 - Check documents in Kibana > Dev Tools > Console.
+  GET _cat/indices/metricbeat-*?v&expand_wildcards=all
+
+  GET metricbeat-*/_search
+  {
+    "size": 5,
+    "query": {"term": {"event.dataset": "system.cpu"}},
+    "sort": [{"@timestamp": {"order": "desc"}}],
+    "_source": [
+      "@timestamp", "host.name", "event.dataset",
+      "system.cpu.total.norm.pct", "system.cpu.cores"
+    ]
+  }
+
+STEP 4.9 - View in Kibana Discover.
+  Stack Management > Data Views > Create data view (if needed)
+    Name: Metricbeat Host Metrics
+    Pattern: metricbeat-*
+    Time field: @timestamp
+  Discover > select Metricbeat Host Metrics > Last 30 minutes
+  KQL: event.dataset: "system.cpu"
+  Add columns: @timestamp, host.name, system.cpu.total.norm.pct
+
+IMPORTANT: MODE A documents use metricbeat-*; they do NOT become the Fleet
+System integration data stream metrics-system.cpu-default. To demonstrate
+L5.4 E2 specifically, keep using your existing Fleet System integration.
+
+======================================================================
+PART 5 - EVIDENCE AND VALIDATION CHECKLIST
+======================================================================
+
+[ ] Confirm exact hostname/IP of node03 and correct Elasticsearch version.
+[ ] metricbeat version returns installed version.
+[ ] metricbeat test config -e => Config OK.
+[ ] metricbeat test output -e => Elasticsearch reachable/authenticated.
+[ ] metricbeat service Active (running).
+[ ] MODE B: Kibana > Stack Monitoring shows actual monitored ES node.
+[ ] MODE B: capture E4 screenshot (time window, node name, metrics).
+[ ] MODE A: Discover metricbeat-* shows system.cpu field with timestamp.
+[ ] Record whether stack-wide metrics are partial (node03 only) or complete.
+[ ] Mask passwords, tokens, API keys and secrets in all evidence screenshots.
+
+QUICK DATA PATH REFERENCE:
+  Fleet System integration -> metrics-system.cpu-* -> Discover -> L5.4 E2
+  Metricbeat System module -> metricbeat-* -> Discover -> optional host lab
+  Metricbeat ES xpack module -> monitoring storage -> Stack Monitoring -> E4
+
+======================================================================
+PART 6 - TROUBLESHOOTING AND REPAIR
+======================================================================
+
+PROBLEM: metricbeat.service fails to start
+  sudo systemctl status metricbeat --no-pager -l
+  sudo journalctl -u metricbeat -n 100 --no-pager
+  sudo metricbeat test config -e
+  sudo metricbeat modules list
+  Check YAML indentation and file ownership/root-only editable config.
+
+PROBLEM: 'no such file' / CA errors
+  sudo ls -l /etc/metricbeat/certs/http_ca.crt
+  sudo ls -l /etc/elasticsearch/certs/http_ca.crt
+  Verify certificate authority matches the configured HTTPS endpoint.
+
+PROBLEM: x509: certificate valid for X, not localhost / IP
+  Use hostname/address included in the HTTP certificate SAN.
+  Fix DNS/hosts or reissue HTTP certificate with intended SAN under
+  approved change procedures. Do NOT disable verification permanently.
+
+PROBLEM: 401 unauthorized / 403 forbidden
+  Check usernames, secure keystore keys and built-in roles.
+  Collector must have remote_monitoring_collector.
+  X-Pack monitoring output writer must have remote_monitoring_agent.
+  Normal host metric writer must publish to metricbeat-*.
+
+PROBLEM: cannot find ${MB_*} in keystore
+  sudo metricbeat keystore list
+  sudo metricbeat keystore add MISSING_KEY_NAME
+  Create/add keystore keys as root when running Metricbeat service as root.
+
+PROBLEM: Kibana Stack Monitoring blank, but service Active
+  Confirm MODE B enabled: sudo metricbeat modules list
+  Confirm correct module URL and collector credentials.
+  Check Metricbeat logs for monitor export/pipeline errors.
+  Check Stack Monitoring time window and collection settings.
+  Verify no mismatch between publishing cluster and Kibana monitoring cluster.
+  A normal System module alone does NOT populate Stack Monitoring.
+
+PROBLEM: CPU documents missing in Discover
+  Confirm MODE A System module enabled or use Fleet's existing data stream.
+  Check field query, hostname, index pattern and Last 30 minutes.
+  Verify `sudo metricbeat test modules system -e` returns samples.
+  Never query /_data_stream/.../_search: search the index/data-stream name.
+
+PROBLEM: index permissions error during 'metricbeat setup'
+  Setup requires more permissions than day-to-day publishing.
+  Use a separate authorized setup identity; do NOT silently grant the
+  writer user full administrator privileges.
+
+PROBLEM: too much duplicate data
+  Avoid enabling Fleet System and Metricbeat System together on same host
+  for the same use case, and avoid duplicate ES X-Pack monitoring collectors.
+
+PROBLEM: need to restore your prior config
+  Stop Metricbeat, restore the named backup from Step 2.4 or Step 4.3,
+  restore the right enabled modules, then test config/output and restart.
+  Do not delete existing stored metrics to troubleshoot service problems.
+
+======================================================================
+OFFICIAL ELASTIC DOCUMENTATION
+======================================================================
+APT install:
+https://www.elastic.co/docs/reference/beats/metricbeat/setup-repositories
+Metricbeat quick start:
+https://www.elastic.co/docs/reference/beats/metricbeat/metricbeat-installation-configuration
+Metricbeat keystore:
+https://www.elastic.co/docs/reference/beats/metricbeat/keystore
+Metricbeat System module:
+https://www.elastic.co/docs/reference/beats/metricbeat/metricbeat-module-system
+System CPU metricset:
+https://www.elastic.co/docs/reference/beats/metricbeat/metricbeat-metricset-system-cpu
+Metricbeat Stack Monitoring:
+https://www.elastic.co/docs/deploy-manage/monitor/stack-monitoring/collecting-monitoring-data-with-metricbeat
+Metricbeat publisher privileges:
+https://www.elastic.co/docs/reference/beats/metricbeat/privileges-to-publish-events
+
+END OF CONFIGURATION MANUAL
