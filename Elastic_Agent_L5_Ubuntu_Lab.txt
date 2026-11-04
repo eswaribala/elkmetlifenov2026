@@ -1,0 +1,513 @@
+L5 — MANAGED COLLECTION
+Elastic Agent enrollment + policy revision using existing Ubuntu/KVM topology
+
+Environment: 3-node Elasticsearch cluster + Kibana / Logstash / Filebeat support host, Ubuntu VMs on KVM
+
+Version: 04 November 2026  |  Lab duration: 75–110 minutes (add 20–30 minutes only if Fleet Server must be deployed)
+
+IMPORTANT ADDRESS CORRECTION: Your supplied Elasticsearch address 192.168.122.227 was repeated. Earlier lab records identify node03 as 192.168.122.102; confirm with hostname -I before installation or production changes.
+
+
+==========================
+1  Actual lab architecture
+==========================
+
+Component / role | Verified IP or URL | Lab action
+
+Kibana + Logstash + Filebeat (support VM, previously es-node1) | 192.168.1.162  •  Kibana http://192.168.1.162:5601 | Fleet UI; optional Fleet Server placement
+
+Elasticsearch node01 | 192.168.122.227:9200 | Elasticsearch HTTPS output
+
+Elasticsearch node02 | 192.168.122.246:9200 | Target VM for ONE monitored Elastic Agent
+
+Elasticsearch node03 | 192.168.122.102:9200 | Elasticsearch HTTPS output
+
+Fleet Server — not yet verified | If hosted on Kibana support VM: https://192.168.1.162:8220 | Check first; create only if absent
+
+Illustrative traffic paths: Browser → Kibana (5601); agent on node02 → Fleet Server (HTTPS 8220) for enrollment and policy; agent on node02 → Elasticsearch (HTTPS 9200) for logs and metrics; Fleet Server → Elasticsearch (9200) for Fleet state.
+
+TWO-SUBNET CHECK: Kibana uses 192.168.1.0/24 while Elasticsearch VMs use the 192.168.122.0/24 libvirt/KVM network. Confirm routing in BOTH directions. Kibana is not the Fleet Server, even if they run on the same VM.
+
+
+===============================
+2  Objectives and safety checks
+===============================
+
+  • Confirm the actual Elasticsearch addresses, certificate trust, and TCP reachability.
+
+  • Find or set up ONE Fleet Server for the lab without disrupting existing Logstash/Filebeat flows.
+
+  • Create a dedicated Fleet-managed agent policy; enroll ONE Elastic Agent on node02.
+
+  • Confirm Healthy status and System CPU metrics in Kibana.
+
+  • Add a custom file log integration, then change its path through a policy revision.
+
+  • Prove that new data arrived without reinstalling the Elastic Agent.
+
+DO NOT DUPLICATE AGENTS: Only one installed Elastic Agent per machine. The Elastic Agent running Fleet Server must be on a different VM from the node02 monitored agent. Keep Filebeat and Logstash already running on the support VM untouched.
+
+
+===================================
+3  Lab settings and exercise naming
+===================================
+
+Setting | Value
+
+Kibana | http://192.168.1.162:5601  (use https if your Kibana endpoint is TLS-enabled)
+
+Fleet Server candidate URL | https://192.168.1.162:8220  ONLY if Fleet Server runs on the support VM
+
+Elasticsearch output | https://192.168.122.227:9200 ; https://192.168.122.246:9200 ; https://192.168.122.102:9200
+
+Agent target | node02  •  192.168.122.246
+
+Agent policy | L5-Ubuntu-Managed-Collection
+
+Custom Logs integration policy | L5-Custom-Log-Collection
+
+Dataset / namespace | l5demo / default
+
+Initial file | /var/log/elastic-l5/l5-initial.log
+
+Revised file | /var/log/elastic-l5/l5-revised.log
+
+
+===============================================
+4  Preflight: verify existing hosts and network
+===============================================
+
+
+------------------------------------------
+Step 4.1 — verify each Elasticsearch VM IP
+------------------------------------------
+
+Run on node01, node02 and node03 respectively. Record the hostname and the current address rather than trusting an old VM snapshot:
+
+    hostname
+    hostname -I
+    ip -4 addr show
+    ip route
+
+Expected: node01 = .227, node02 = .246, node03 = .102. If an address differs, update the Fleet output hosts and the rest of this manual to match the LIVE IPs.
+
+
+--------------------------------------------------------
+Step 4.2 — test Elasticsearch from the support/Kibana VM
+--------------------------------------------------------
+
+    curl -vk https://192.168.122.227:9200
+    curl -vk https://192.168.122.246:9200
+    curl -vk https://192.168.122.102:9200
+
+An HTTP 401 response usually proves that HTTPS networking works and authentication is required. Connection timeout/refused or TLS handshake errors need diagnosis. The -k flag is only for a connectivity probe.
+
+
+-----------------------------------------------
+Step 4.3 — inspect Elasticsearch CA and version
+-----------------------------------------------
+
+Run on node01; the source CA path was used in your prior Elasticsearch installation:
+
+    sudo ls -l /etc/elasticsearch/certs/http_ca.crt
+    sudo openssl x509 -in /etc/elasticsearch/certs/http_ca.crt \
+      -noout -fingerprint -sha256
+    sudo openssl x509 -in /etc/elasticsearch/certs/http_ca.crt \
+      -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ":"
+
+Record the last line (hex SHA-256 CA fingerprint). This is an option for Fleet → Settings → Outputs → Elasticsearch CA trusted fingerprint. Use it only when the endpoints present certificate chains signed by this CA; otherwise configure the correct CA(s).
+
+In Kibana → Dev Tools → Console, run:
+
+    GET /
+    GET _cluster/health
+    GET _cat/nodes?v
+
+Expected: three nodes available. Do not infer Elasticsearch version solely from the Filebeat package version.
+
+
+-------------------------------------------------------
+Step 4.4 — test routing from node02 to the support host
+-------------------------------------------------------
+
+    ip route get 192.168.1.162
+    curl -I --max-time 10 http://192.168.1.162:5601
+    # If Kibana uses TLS instead:
+    curl -kI --max-time 10 https://192.168.1.162:5601
+
+If access fails, diagnose the VM bridge/NAT routes, local firewall and the address exposed by the Kibana VM. Do NOT replace an address with localhost for inter-VM communication.
+
+
+========================================
+5  Fleet Server: verify before deploying
+========================================
+
+
+-----------------------------
+Step 5.1 — check the Fleet UI
+-----------------------------
+
+Open http://192.168.1.162:5601 → log in → Management / Fleet → Agents. If an existing Fleet Server agent is Healthy, use its actual URL from Fleet → Settings and skip the remainder of Step 5. If none exists, proceed below.
+
+
+------------------------------------------------
+Step 5.2 — optional lab deployment on support VM
+------------------------------------------------
+
+PLACEMENT CONDITION: Only consider the Kibana/Logstash/Filebeat support VM at 192.168.1.162 if it has no Elastic Agent already installed, has sufficient CPU/RAM, and is reachable from node02 on port 8220. A dedicated Fleet Server VM is preferable when available.
+
+On 192.168.1.162, check whether Elastic Agent or Fleet Server is installed and whether 8220 is bound:
+
+    command -v elastic-agent || true
+    sudo systemctl status elastic-agent --no-pager
+    sudo ss -lntp | grep ":8220" || true
+    sudo ufw status
+
+Kibana → Fleet → Agents → Add Fleet Server → Quick Start. Proposed name: L5-Fleet-Server. Only if hosting there, set URL to https://192.168.1.162:8220. Generate the Fleet Server policy and copy the EXACT Ubuntu/Linux installation command produced by YOUR Kibana version; it contains a service token and version-specific options. Do not put secrets into this document.
+
+If UFW is enabled and port 8220 is blocked, allow it for the trusted lab subnet using an approved firewall rule. A broad allow is shown only as a troubleshooting option:
+
+    # Run ONLY on the selected Fleet Server VM, if UFW is active:
+    sudo ufw allow from 192.168.122.0/24 to any port 8220 proto tcp
+    sudo ufw status
+
+After running the generated Kibana command on the chosen Fleet Server VM, verify:
+
+    sudo systemctl status elastic-agent --no-pager
+    sudo elastic-agent status
+    sudo ss -lntp | grep ":8220"
+
+From node02, verify the actual advertised host (example below assumes Fleet Server runs on support VM):
+
+    curl -vk https://192.168.1.162:8220/api/status
+
+Quick Start commonly creates self-signed Fleet Server certificates. For an isolated training lab, Kibana may generate an agent installation command with --insecure; trusted CA certificates are required for real deployment. Fleet Server CA trust and Elasticsearch output CA trust are separate settings.
+
+
+===============================================
+6  Configure Fleet settings for these exact IPs
+===============================================
+
+
+-----------------------------
+Step 6.1 — Fleet Server hosts
+-----------------------------
+
+Kibana → Fleet → Settings → Fleet Server hosts. Retain the currently Healthy Fleet Server URL. If you installed it on the support VM above, configure:
+
+    https://192.168.1.162:8220
+
+This URL must be reachable from node02. If your Fleet Server is on another machine, enter its actual IP/DNS and use that URL throughout the enrollment steps.
+
+
+-------------------------------
+Step 6.2 — Elasticsearch output
+-------------------------------
+
+Kibana → Fleet → Settings → Outputs → Edit default output. Under Hosts, configure your reachable HTTPS Elasticsearch nodes:
+
+    https://192.168.122.227:9200
+    https://192.168.122.246:9200
+    https://192.168.122.102:9200
+
+Provide trusted Elasticsearch CA content or the verified hex CA fingerprint from Step 4.3, and Save. TLS must trust the presented certificate; if the cert does not include an IP SAN, use DNS names that match its certificate rather than disabling verification. Your Elasticsearch ports and certificates may be exposed differently; confirm in your live cluster.
+
+IMPORTANT: Use HTTPS endpoints. The agent uses the Fleet Server (8220) for policy and Elasticsearch (9200) for telemetry. Elasticsearch output failure can cause no data even when enrollment succeeds.
+
+
+===========================================
+7  Create dedicated L5 managed agent policy
+===========================================
+
+  Kibana → Fleet → Agent policies → Create agent policy.
+
+  Name: L5-Ubuntu-Managed-Collection; namespace: default; description: Node02 fleet-managed collection practical.
+
+  Enable System logs and metrics if offered; otherwise add the System integration to the new policy.
+
+  Save the policy and record its starting revision number (shown in Fleet UI / policy view depending on version).
+
+  Do not select an existing shared policy used by other participants.
+
+Evidence E1: Screenshot of the policy and System integration; baseline revision __________.
+
+
+=======================================================
+8  Enroll ONE Elastic Agent on node02 (192.168.122.246)
+=======================================================
+
+
+-------------------------------------------------
+Step 8.1 — make sure node02 has no existing agent
+-------------------------------------------------
+
+Log in to node02 with SSH or VM console; do not run the new installation on the Kibana support host.
+
+    hostname
+    hostname -I
+    command -v elastic-agent || true
+    systemctl list-unit-files | grep -i elastic-agent || true
+    sudo systemctl status elastic-agent --no-pager
+
+If the service already exists, do not install a second one. Instead use Kibana Fleet → Agents → Assign to new policy if appropriate, or perform the lab on a different unused Ubuntu VM.
+
+
+----------------------------------------------------------
+Step 8.2 — use Kibana-generated Linux installation command
+----------------------------------------------------------
+
+Kibana → Fleet → Agents → Add agent → Choose the existing L5-Ubuntu-Managed-Collection policy → select Linux (x86_64 if applicable). Copy the exact download, extract and install commands for your current Elastic Stack version. General structure:
+
+    curl -L -O https://artifacts.elastic.co/downloads/beats/elastic-agent/\
+    elastic-agent-<VERSION>-linux-x86_64.tar.gz
+    tar xzf elastic-agent-<VERSION>-linux-x86_64.tar.gz
+    cd elastic-agent-<VERSION>-linux-x86_64
+
+The URL line above is schematic; use the unbroken URL that Kibana actually provides. Never use <VERSION> literally.
+
+
+-----------------------------------------------
+Step 8.3 — enroll in the reachable Fleet Server
+-----------------------------------------------
+
+If your Fleet Server was set up on 192.168.1.162 with a lab self-signed certificate, this is the expected command structure (paste your real token only in the terminal):
+
+    sudo ./elastic-agent install \
+      --url=https://192.168.1.162:8220 \
+      --enrollment-token=<YOUR_L5_POLICY_TOKEN> \
+      --insecure
+
+Use --insecure only for an isolated, trusted classroom lab. For a trusted Fleet CA, omit --insecure and instead pass --certificate-authorities=/path/to/fleet-server-ca.crt. If Fleet Server is elsewhere, replace the --url with the actual Fleet Server URL shown in Fleet → Settings. Only the enrollment token generated for the L5 policy should be used.
+
+
+-------------------------------------------
+Step 8.4 — validate service and agent state
+-------------------------------------------
+
+    sudo systemctl status elastic-agent --no-pager
+    sudo elastic-agent version
+    sudo elastic-agent status
+    sudo elastic-agent status --output full
+
+Kibana → Fleet → Agents: select node02. Verify host name, policy L5-Ubuntu-Managed-Collection, Healthy status, and recent check-in. Evidence E2: screenshot of agent enrolled and Healthy.
+
+
+=========================================
+9  Verify baseline System data collection
+=========================================
+
+Kibana → Discover → select / create data view metrics-* → Last 15 minutes. Search for the enrolled host:
+
+    host.name : "node02"
+
+Open one record and inspect data_stream.dataset; for traditional System integration CPU metrics you can narrow to:
+
+    data_stream.dataset : "system.cpu"
+
+The exact dataset may vary with integration and stack version; inspect actual records instead of treating this filter as universal. In Kibana Dev Tools:
+
+    GET _data_stream/metrics-*
+
+Evidence E3: screenshot of recent CPU / memory metric documents from node02. If no records appear, check Fleet output TLS trust before changing the agent.
+
+
+===============================================
+10  Policy revision #1 — add a custom log input
+===============================================
+
+
+----------------------------------------------
+Step 10.1 — create a unique test log on node02
+----------------------------------------------
+
+    sudo install -d -m 755 /var/log/elastic-l5
+    sudo touch /var/log/elastic-l5/l5-initial.log
+    sudo chmod 644 /var/log/elastic-l5/l5-initial.log
+    for i in $(seq 1 50); do
+      echo "L5_INITIAL event=$i level=INFO host=node02 timestamp=$(date -Is)"
+    done | sudo tee -a /var/log/elastic-l5/l5-initial.log >/dev/null
+    wc -c /var/log/elastic-l5/l5-initial.log
+
+The file should be larger than 1024 bytes because modern Custom Logs (Filestream) uses fingerprint-based file identity by default.
+
+
+-----------------------------------------
+Step 10.2 — create the integration policy
+-----------------------------------------
+
+  Kibana → Fleet → Agent policies → L5-Ubuntu-Managed-Collection → Add integration.
+
+  Find Custom Logs (Filestream). Select a package compatible with your running Kibana/Agent version.
+
+  Name the integration policy L5-Custom-Log-Collection.
+
+  Set log file path /var/log/elastic-l5/l5-initial.log and dataset l5demo (if the field is presented).
+
+  Choose namespace default and the existing L5-Ubuntu-Managed-Collection agent policy.
+
+  Save and continue. Do not reinstall or restart the agent simply to apply this change.
+
+VERSION NOTE: The current Custom Logs (Filestream) package documentation lists newer releases requiring Kibana 9.4+. Install the compatible package version exposed by your Kibana, and avoid blindly upgrading a working cluster for this exercise.
+
+
+--------------------------------------------
+Step 10.3 — verify updated policy and events
+--------------------------------------------
+
+Fleet → Agents → node02 → check current revision / component status; then in Kibana Discover → logs-* → Last 30 minutes:
+
+    message : "L5_INITIAL"
+
+If a KQL text match is difficult to interpret, use Dev Tools (queries the existing logs data streams):
+
+    GET logs-*/_search
+    {
+      "size": 5,
+      "sort": [{"@timestamp": "desc"}],
+      "query": {"match_phrase": {"message": "L5_INITIAL"}}
+    }
+
+Additional proof: append another event after the integration is active:
+
+    echo "L5_INITIAL after_policy_change $(date -Is)" | \
+      sudo tee -a /var/log/elastic-l5/l5-initial.log >/dev/null
+
+Evidence E4: screenshot of updated agent policy; E5: recent L5_INITIAL events and data_stream.dataset. Record revision after first change __________.
+
+
+======================================================
+11  Policy revision #2 — change the log path centrally
+======================================================
+
+
+------------------------------------------
+Step 11.1 — make second log file on node02
+------------------------------------------
+
+    sudo touch /var/log/elastic-l5/l5-revised.log
+    sudo chmod 644 /var/log/elastic-l5/l5-revised.log
+    for i in $(seq 1 50); do
+      echo "L5_REVISED event=$i level=INFO host=node02 timestamp=$(date -Is)"
+    done | sudo tee -a /var/log/elastic-l5/l5-revised.log >/dev/null
+    wc -c /var/log/elastic-l5/l5-revised.log
+
+
+-----------------------------------------------------
+Step 11.2 — revise the existing integration in Kibana
+-----------------------------------------------------
+
+Fleet → Agent policies → L5-Ubuntu-Managed-Collection → find L5-Custom-Log-Collection → Actions (•••) → Edit integration. Change ONLY the log file path:
+
+    OLD: /var/log/elastic-l5/l5-initial.log
+    NEW: /var/log/elastic-l5/l5-revised.log
+
+Keep dataset l5demo and namespace default unchanged; Save. Fleet distributes the updated agent policy automatically. The Elastic Agent on node02 does not need to be reinstalled.
+
+
+-------------------------------------
+Step 11.3 — verify revised collection
+-------------------------------------
+
+    echo "L5_REVISED after_second_revision $(date -Is)" | \
+      sudo tee -a /var/log/elastic-l5/l5-revised.log >/dev/null
+
+Kibana → Discover → logs-* → Last 30 minutes → KQL:
+
+    message : "L5_REVISED"
+
+Optional Dev Tools query:
+
+    GET logs-*/_search
+    {
+      "size": 5,
+      "sort": [{"@timestamp": "desc"}],
+      "query": {"match_phrase": {"message": "L5_REVISED"}}
+    }
+
+Optional stop-reading test: after the agent reports the new policy as applied, append a unique L5_OLD_AFTER_SWITCH line to l5-initial.log and verify it is not newly ingested, assuming no other collector reads that file. Old indexed documents are not deleted by changing the path.
+
+Evidence E6: revised path in integration settings; E7: L5_REVISED events in Discover; final revision __________.
+
+
+=========================================
+12  Troubleshooting against your topology
+=========================================
+
+Symptom | Check / command | Action
+
+Cannot reach 192.168.1.162:8220 | On node02: curl -vk https://192.168.1.162:8220/api/status | Check Fleet Server location, port 8220, UFW, routing between the two subnets.
+
+Fleet enrollment x509 failure | Compare Fleet Server cert SAN and the Fleet CA | Use matching host name and proper CA; --insecure only in isolated lab.
+
+Agent Healthy, no logs/metrics | On node02: curl -vk https://192.168.122.227:9200 | Check Fleet default output hosts, CA trust, credentials and data views.
+
+Agent service unhealthy | sudo elastic-agent status --output full | Also run sudo journalctl -u elastic-agent -n 100 --no-pager.
+
+Policy revision not delivered | Fleet → Agents → node02 → check-in / revision | Check Fleet Server connectivity and policy association.
+
+Filestream log data absent | wc -c /var/log/elastic-l5/l5-revised.log | Ensure file >1024 bytes, path exact, permissions readable; extend time range.
+
+Existing Elastic Agent on node02 | systemctl list-unit-files | grep elastic-agent | Reassign current agent to lab policy only if safe; never install another instance.
+
+192.168.122.102 unreachable | node03: hostname -I; Kibana host: ip route | Correct changed VM IP; verify the libvirt network and ES API listening.
+
+If you cannot install Custom Logs (Filestream) due to version constraints: demonstrate central revision by editing the System integration settings or changing policy-level agent monitoring, then confirm the new revision in Fleet. Do not change shared ES node settings while testing.
+
+
+===================================
+13  Learner evidence and acceptance
+===================================
+
+[  ] E1  L5 policy created; starting revision recorded.
+
+[  ] E2  Exactly one node02 Elastic Agent enrolled and Healthy.
+
+[  ] E3  Metrics visible for node02 in Discover.
+
+[  ] E4  Custom Logs integration attached to L5 policy.
+
+[  ] E5  L5_INITIAL log records visible.
+
+[  ] E6  Log path revised from l5-initial.log to l5-revised.log.
+
+[  ] E7  L5_REVISED documents visible without reinstalling the agent.
+
+Pass condition: successful enrollment, policy update applied centrally, and proof that the new file was ingested. Learner should explain: Fleet Server distributes configuration (control plane), while the Elastic Agent sends telemetry to Elasticsearch (data plane).
+
+
+============================================
+14  Quick reference: role → direction → port
+============================================
+
+Source → Destination | Protocol | Purpose
+
+Administrator → Kibana 192.168.1.162 | HTTP(S) 5601 | Manage policies / integrations / agents
+
+node02 192.168.122.246 → Fleet Server | HTTPS 8220 | Enroll, check in and receive policy changes
+
+node02 192.168.122.246 → ES .227 / .246 / .102 | HTTPS 9200 | Ship logs and metrics via output
+
+Fleet Server → ES cluster | HTTPS 9200 | Policy state and management data
+
+Kibana → ES cluster | HTTPS 9200 | Search and Fleet configuration
+
+
+===============================
+15  Official Elastic references
+===============================
+
+Install Fleet-managed Elastic Agents — https://www.elastic.co/docs/reference/fleet/install-fleet-managed-elastic-agent
+
+Self-managed Fleet Server — https://www.elastic.co/docs/reference/fleet/add-fleet-server-on-prem
+
+Agent policies — https://www.elastic.co/docs/reference/fleet/agent-policy
+
+Fleet settings / outputs — https://www.elastic.co/docs/reference/fleet/fleet-settings
+
+Agent CLI reference — https://www.elastic.co/docs/reference/fleet/agent-command-reference
+
+Custom Logs (Filestream) integration — https://www.elastic.co/docs/reference/integrations/filestream
+
+Fleet troubleshooting — https://www.elastic.co/docs/troubleshoot/ingest/fleet/common-problems
+
+Lab manual note: all installation tokens and passwords are intentionally placeholders. Obtain them from your live Kibana/Fleet UI; do not share them in documents or screenshots.
