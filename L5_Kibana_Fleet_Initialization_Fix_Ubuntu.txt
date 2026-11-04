@@ -1,0 +1,258 @@
+L5 LAB: FIX KIBANA FLEET INITIALIZATION AND CONTINUE TO FLEET SERVER
+===================================================================
+Platform: Existing Ubuntu/KVM Elastic Stack lab
+Kibana host: 192.168.1.162 (also accessed locally as http://localhost:5601)
+Elasticsearch cluster: existing 192.168.122.x nodes
+Target for Elastic Agent enrollment: node03 (after Fleet Server is running)
+Prepared: 04 November 2026
+
+LAB OBJECTIVES
+--------------
+1. Fix Kibana's "Unable to initialize Fleet" error.
+2. Preserve existing configuration and previously encrypted data.
+3. Verify Kibana and Fleet are functional.
+4. Understand the next steps required before enrolling Elastic Agent.
+
+ERROR FROM YOUR KIBANA SCREEN
+-----------------------------
+Unable to initialize Fleet
+Agent binary source needs encrypted saved object api key to be set
+
+CAUSE
+-----
+Fleet requires a persistent xpack.encryptedSavedObjects.encryptionKey
+for securely storing sensitive settings. Without a configured key,
+Kibana can start but certain features, including Fleet, may fail.
+This is a KIBANA CONFIGURATION ISSUE, not an Elasticsearch CA-fingerprint
+problem. Do not reinstall Elasticsearch to fix this error.
+
+IMPORTANT SAFETY NOTES
+----------------------
+- Execute Steps 1-7 on the Kibana Ubuntu VM (192.168.1.162), NOT node03.
+- Do not share your encryption key, tokens, passwords, or API keys.
+- If an encryption key is already in use, DO NOT replace it casually:
+  existing encrypted saved objects may become unreadable.
+- Do not add duplicate active YAML settings.
+- This guide assumes the Ubuntu Debian-package Kibana layout:
+  /etc/kibana/kibana.yml and systemd service 'kibana'.
+- Fleet Server is a separate service, not part of Kibana's HTTP port 5601.
+
+STEP 1: CONFIRM KIBANA IS RUNNING ON 192.168.1.162
+--------------------------------------------------
+Open Terminal on Kibana VM and run:
+
+  hostname -I
+  sudo systemctl status kibana --no-pager
+  sudo ss -lntp | grep 5601
+
+Expected: Kibana service should report active (running).
+
+Check local HTTP response:
+
+  curl -I http://127.0.0.1:5601
+
+Note: A redirect or authentication-related HTTP status is not necessarily
+an error; inability to connect is an error. If Kibana uses HTTPS, change
+http:// to https:// and add -k only for a self-signed lab certificate.
+
+STEP 2: CHECK FOR AN ALREADY-CONFIGURED KEY (DO NOT PRINT IT)
+------------------------------------------------------------
+Check whether the YAML file contains an active key:
+
+  if sudo grep -Eq '^[[:space:]]*xpack\.encryptedSavedObjects\.encryptionKey[[:space:]]*:' /etc/kibana/kibana.yml; then
+      echo 'Key setting found in kibana.yml; do not replace it.'
+  else
+      echo 'No active key setting found in kibana.yml.'
+  fi
+
+Check Kibana keystore keys (this lists names, not secret values):
+
+  sudo /usr/share/kibana/bin/kibana-keystore list
+
+Look for:
+
+  xpack.encryptedSavedObjects.encryptionKey
+
+If the setting is already present in EITHER location, stop before adding
+another copy: inspect the service logs/configuration and confirm the
+active setting is valid. A valid key must be 32+ characters. If using
+multiple Kibana instances, the key must be consistent across instances.
+
+STEP 3: BACK UP KIBANA CONFIGURATION
+------------------------------------
+If the key is absent from both YAML and keystore, create a backup:
+
+  sudo cp -a /etc/kibana/kibana.yml /etc/kibana/kibana.yml.bak-before-fleet
+
+Check backup:
+
+  sudo ls -l /etc/kibana/kibana.yml.bak-before-fleet
+
+STEP 4: GENERATE A NEW ENCRYPTION KEY
+-------------------------------------
+ONLY WHEN NO EXISTING KEY WAS CONFIGURED:
+
+  sudo /usr/share/kibana/bin/kibana-encryption-keys generate
+
+The tool prints several settings. For this error, copy the value of:
+
+  xpack.encryptedSavedObjects.encryptionKey
+
+It must be a strong string of at least 32 characters.
+Do NOT paste the secret into screenshots or chat messages.
+
+STEP 5: SET THE KEY IN /etc/kibana/kibana.yml
+---------------------------------------------
+Open the file:
+
+  sudo nano /etc/kibana/kibana.yml
+
+Add ONE active line (replace the placeholder with YOUR generated key):
+
+  xpack.encryptedSavedObjects.encryptionKey: "PASTE_YOUR_ACTUAL_GENERATED_KEY_HERE"
+
+Do NOT paste the literal placeholder into the configuration.
+Do NOT add the setting if it is already configured in the Kibana keystore.
+
+Nano save sequence:
+  Ctrl+O, Enter, Ctrl+X
+
+An alternative for advanced administrators is storing the key in the
+Kibana keystore instead of the YAML file. Use one configuration source,
+not both. Keep the key secure and backed up through your normal secret
+management process.
+
+STEP 6: RESTART KIBANA AND VALIDATE
+------------------------------------
+Run:
+
+  sudo systemctl restart kibana
+  sudo systemctl status kibana --no-pager
+
+If it fails or remains in a restarting state, inspect logs:
+
+  sudo journalctl -u kibana -n 80 --no-pager
+
+Check that port 5601 is listening:
+
+  sudo ss -lntp | grep 5601
+
+If Kibana fails due to a YAML parsing error, restore or fix the YAML:
+
+  sudo nano /etc/kibana/kibana.yml
+
+Common mistakes:
+- Misspelled setting name or incorrect capitalization.
+- Missing quotation mark.
+- Duplicate active setting.
+- Copied the placeholder rather than the generated key.
+- Existing keystore setting conflicts with a YAML setting.
+
+STEP 7: VERIFY FLEET IN THE KIBANA USER INTERFACE
+-------------------------------------------------
+On the Kibana VM, open:
+
+  http://localhost:5601/app/fleet/settings
+
+From another computer (only if Kibana's server.host and networking permit):
+
+  http://192.168.1.162:5601/app/fleet/settings
+
+In Kibana:
+  1) Sign in with an account that has Fleet permissions.
+  2) Open Management > Fleet (UI labels can vary by version).
+  3) Choose the Settings tab.
+  4) Confirm the red "Unable to initialize Fleet" banner is gone.
+  5) Check that Agents and Agent policies tabs are accessible.
+
+If the initialization error persists:
+  - Hard-refresh the browser (Ctrl+Shift+R).
+  - Recheck that the key exists and Kibana restarted successfully.
+  - Inspect Kibana logs:
+
+      sudo journalctl -u kibana -n 120 --no-pager
+
+  - Check for configuration supplied by a service environment or other
+    active configuration source. Do not rotate keys as a first fix.
+
+STEP 8: OPTIONAL NEXT PHASE - CONFIGURE FLEET SERVER
+----------------------------------------------------
+Do this only AFTER Fleet initializes. The next phase is necessary because
+node03 previously received "Connection refused" on 192.168.1.162:8220.
+
+Fleet Server URL planned for this lab:
+
+  https://192.168.1.162:8220
+
+In Kibana UI:
+  1) Open Management > Fleet > Agents.
+  2) Use the Add Fleet Server option if no Fleet Server exists.
+  3) Select a dedicated Fleet Server policy or create one.
+  4) Use Quick Start ONLY for an isolated training environment.
+  5) Choose the host that will run Fleet Server. The Kibana Ubuntu VM can
+     run Elastic Agent/Fleet Server if resources and network allow.
+  6) Use the exact installation command that YOUR Kibana displays,
+     including the correct version, service token, policy and URLs.
+  7) Verify Fleet Server can reach Elasticsearch on port 9200, with
+     correct TLS trust. The Elasticsearch CA is not automatically the
+     same as the Fleet Server TLS certificate authority.
+
+On the Fleet Server VM, after successful installation:
+
+  sudo systemctl status elastic-agent --no-pager
+  sudo ss -lntp | grep 8220
+  curl -k -i https://127.0.0.1:8220/api/status
+
+On node03, test Fleet Server remotely:
+
+  curl -k -i https://192.168.1.162:8220/api/status
+
+The -k option is for temporary testing against a lab self-signed
+certificate; use CA validation for production. Port 8220 must be
+reachable from node03 and not blocked by a firewall or VM networking.
+
+Interpretation:
+  Connection refused -> no service listening on destination/port,
+                        or another network component actively rejects it.
+  Timeout            -> likely routing/firewall/network reachability.
+  HTTPS response     -> Fleet Server is reachable; inspect status details.
+
+STEP 9: NEXT PHASE - ENROLL ELASTIC AGENT ON node03
+---------------------------------------------------
+Only when Fleet Server is healthy:
+  1) In Kibana > Fleet > Agent policies, create an L5 dedicated policy:
+       L5-Ubuntu-Managed-Policy
+  2) Navigate to Fleet > Agents > Add agent.
+  3) Select the new policy and Linux architecture.
+  4) Copy the EXACT generated Elastic Agent install/enroll command.
+  5) Run it on node03 (not the Kibana VM unless that is your intended
+     agent destination).
+  6) Verify:
+       sudo systemctl status elastic-agent --no-pager
+       sudo elastic-agent status
+  7) Confirm Healthy under Fleet > Agents.
+  8) Add/modify the System integration or custom-log integration in the
+     agent policy, save, and confirm node03 receives the new policy.
+
+Do not run a guessed enrollment command or reuse the Elasticsearch CA
+fingerprint as an agent enrollment token. Kibana provides the proper
+Fleet enrollment token and installation command.
+
+LAB SUCCESS CHECKLIST
+---------------------
+[ ] Kibana starts cleanly and port 5601 listens.
+[ ] Exactly one intended persistent encrypted saved objects key is set.
+[ ] Fleet opens without the initialization error.
+[ ] Fleet Server is installed/listening on port 8220 (next phase).
+[ ] node03 can reach Fleet Server's /api/status endpoint.
+[ ] node03 has a Healthy Elastic Agent (after enrollment).
+[ ] Revision to L5 policy reaches node03 (after agent setup).
+
+REFERENCE - OFFICIAL ELASTIC DOCUMENTATION
+-------------------------------------------
+https://www.elastic.co/docs/reference/kibana/configuration-reference/security-settings
+https://www.elastic.co/docs/reference/kibana/commands/kibana-encryption-keys
+https://www.elastic.co/docs/deploy-manage/security/secure-saved-objects
+https://www.elastic.co/docs/deploy-manage/deploy/self-managed/tutorial-self-managed-install
+
+END OF LAB GUIDE
