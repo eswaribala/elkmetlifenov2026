@@ -227,6 +227,9 @@ Only when Fleet Server is healthy:
   4) Copy the EXACT generated Elastic Agent install/enroll command.
   5) Run it on node03 (not the Kibana VM unless that is your intended
      agent destination).
+  if certificate error comes run the following
+  sudo /opt/Elastic/Agent/elastic-agent enroll --url=https://192.168.1.162:8220 --enrollment-token=<token> --insecure
+
   6) Verify:
        sudo systemctl status elastic-agent --no-pager
        sudo elastic-agent status
