@@ -1,0 +1,104 @@
+Step 1 — Check apm.env on rps1
+Open the file:
+cd ~/apm-lab
+nano apm.env
+
+
+Check these settings:
+ELASTIC_APM_SERVER_URL="http://127.0.0.1:8200"
+ELASTIC_APM_SECRET_TOKEN="YOUR_ACTUAL_SECRET_TOKEN"
+ELASTIC_APM_TRANSACTION_SAMPLE_RATE=1.0
+ELASTIC_APM_CENTRAL_CONFIG=false
+ELASTIC_APM_ENABLED=true
+ELASTIC_APM_RECORDING=true
+ELASTIC_APM_DISABLE_SEND=false
+
+
+Important: The secret token must match the token configured in Fleet → Agent policies → Fleet Server Policy → Elastic APM. Do not use a Fleet enrollment token or Elasticsearch password as the APM secret token. 
+Elastic Docs+1
+
+
+You can check whether the variables are loaded without displaying the secret:
+set -a
+source ~/apm-lab/apm.env
+set +a
+
+echo "$ELASTIC_APM_SERVER_URL"
+
+if [ -n "$ELASTIC_APM_SECRET_TOKEN" ]; then
+  echo "APM secret token is populated"
+else
+  echo "APM secret token is missing"
+fi
+
+
+If the value is still YOUR_ACTUAL_SECRET_TOKEN or a REPLACE_... placeholder, it is not configured correctly.
+Step 2 — Restart Flask with APM debug logging
+Stop both Flask applications using Ctrl+C.
+
+Terminal 1 — Payment Service
+cd ~/apm-lab
+source .venv/bin/activate
+
+set -a
+source ./apm.env
+set +a
+
+export ELASTIC_APM_SERVICE_NAME=payment-service
+export ELASTIC_APM_ENVIRONMENT=lab
+export ELASTIC_APM_LOG_LEVEL=debug
+export ELASTIC_APM_LOG_FILE=/tmp/payment-apm-debug.log
+
+python payments.py
+
+
+Terminal 2 — Order Service
+cd ~/apm-lab
+source .venv/bin/activate
+
+set -a
+source ./apm.env
+set +a
+
+export ELASTIC_APM_SERVICE_NAME=order-service
+export ELASTIC_APM_ENVIRONMENT=lab
+export ELASTIC_APM_LOG_LEVEL=debug
+export ELASTIC_APM_LOG_FILE=/tmp/order-apm-debug.log
+
+python orders.py
+
+
+The Python APM agent supports debug-level file logging to identify sending and configuration errors. 
+APM Python agent
+
+Step 3 — Generate requests and inspect errors
+Open Terminal 3:
+for i in $(seq 1 20); do
+  curl -s -o /dev/null \
+    -w '%{http_code}\n' \
+    'http://127.0.0.1:5050/purchase?mode=normal'
+done
+
+
+Inspect the APM logs:
+tail -n 60 /tmp/order-apm-debug.log
+
+
+tail -n 60 /tmp/payment-apm-debug.log
+
+
+Look for 401, 403, 400, connection refused, failed, or error.
+
+Redact any tokens, authorization headers, or other secrets before sharing logs.
+Step 4 — Inspect APM Server logs in Fleet
+In Kibana:
+1. Go to Fleet → Agents.
+2. Click rps1.
+3. Open the Logs tab.
+4. Filter for the elastic_agent.apm_server dataset.
+5. Generate another request and look for APM intake activity.
+For successful ingestion, the APM intake endpoint normally returns HTTP 202 Accepted. The HTTP 200 response from the root endpoint that you showed earlier confirms reachability, but not ingestion. 
+Elastic Docs
+
+Step 5 — Verify again in Dev Tools
+GET _data_stream/traces-apm*
