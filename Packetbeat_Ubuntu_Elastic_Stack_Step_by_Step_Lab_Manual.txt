@@ -194,49 +194,69 @@ certificate used at https://<ES_NODE>:9200.
 
     sudo install -d -m 0755 /etc/packetbeat/certs
 
-4.2. OPTION A: Your working Logstash has already been configured with the
-     SAME Elasticsearch HTTP CA (example path from the Logstash lab):
+4.1 Verify the certificate on the Kibana VM
+Your existing Elasticsearch HTTP CA certificate is:
+/var/lib/kibana/ca_1793622725962.crt
 
-    ls -l /usr/share/logstash/certs/ca/ca.crt
 
-    If this file exists and is the correct ES HTTP CA:
+Run:
+sudo ls -l /var/lib/kibana/ca_1793622725962.crt
 
-    sudo install -m 0644 /usr/share/logstash/certs/ca/ca.crt \
-      /etc/packetbeat/certs/es-http-ca.crt
 
-4.3. OPTION B: Copy the ES HTTP CA from esnode-1.
-     On esnode-1, the package auto-security configuration commonly stores it
-     at /etc/elasticsearch/certs/http_ca.crt. Your custom TLS deployment may
-     use a different path. Find the ACTUAL HTTP CA file first.
+Verify the certificate:
+sudo openssl x509 \
+  -in /var/lib/kibana/ca_1793622725962.crt \
+  -noout -subject -issuer -dates
 
-    On esnode-1:
 
-    sudo cp /etc/elasticsearch/certs/http_ca.crt /tmp/es-http-ca.crt
-    sudo chmod 0644 /tmp/es-http-ca.crt
+4.2 Create the Packetbeat certificate directory
+sudo install -d -m 0755 /etc/packetbeat/certs
 
-    From the Packetbeat VM (replace ubuntu with your actual SSH user):
 
-    scp ubuntu@esnode-1:/tmp/es-http-ca.crt /tmp/es-http-ca.crt
-    sudo install -m 0644 /tmp/es-http-ca.crt \
-      /etc/packetbeat/certs/es-http-ca.crt
-    rm -f /tmp/es-http-ca.crt
+4.3 Copy the existing Kibana CA certificate
+sudo install -m 0644 \
+  /var/lib/kibana/ca_1793622725962.crt \
+  /etc/packetbeat/certs/es-http-ca.crt
 
-    Back on esnode-1:
 
-    sudo rm -f /tmp/es-http-ca.crt
+Verify:
+sudo ls -l /etc/packetbeat/certs/es-http-ca.crt
 
-    The copied certificate is public CA data, NOT a private key. Never copy
-    Elasticsearch server private keys to the Packetbeat VM.
 
-4.4. Verify the actual HTTPS endpoint (curl prompts for elastic password):
+Expected output includes:
+-rw-r--r-- ... es-http-ca.crt
 
-    curl --cacert /etc/packetbeat/certs/es-http-ca.crt \
-      -u elastic https://esnode-1:9200
 
-    Expected: JSON cluster name, version and tagline after successful login.
-    An authentication error means the CA / connection may work but the
-    credentials were refused. A certificate validation error requires the
-    correct CA and a URL that matches the server certificate.
+4.4 Configure Packetbeat
+Open:
+sudo nano /etc/packetbeat/packetbeat.yml
+
+
+In your existing output.elasticsearch section, configure the certificate as follows:
+output.elasticsearch:
+  hosts: ["https://ESNODE1_NAME:9200"]
+  username: "elastic"
+  password: "${ES_PWD}"
+  ssl.certificate_authorities:
+    - "/etc/packetbeat/certs/es-http-ca.crt"
+
+
+Replace ESNODE1_NAME with the actual Elasticsearch hostname or IP address matching its TLS certificate. ${ES_PWD} must already be defined in the Packetbeat keystore or service environment.
+4.5 Validate Packetbeat
+sudo packetbeat test config -e
+
+
+Expected:
+Config OK
+
+
+Test Elasticsearch connectivity:
+sudo packetbeat test output -e
+
+
+After successful validation:
+sudo systemctl restart packetbeat
+sudo systemctl status packetbeat
 
 SECTION 5 - BACK UP AND EDIT PACKETBEAT CONFIGURATION
 ------------------------------------------------------
