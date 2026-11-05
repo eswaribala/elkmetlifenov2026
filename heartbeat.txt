@@ -32,3 +32,20 @@ heartbeat.monitors:
     name: Elasticsearch node1 - ICMP
     schedule: '@every 10s'
     hosts: ["ESNODE1_NAME"]
+
+heartbeat.scheduler:
+  limit: 10
+
+processors:
+  - add_observer_metadata:
+      geo:
+        name: ubuntu-kibana-lab
+
+output.elasticsearch:
+  hosts: ["https://ESNODE1_NAME:9200"]
+  username: "elastic"
+  password: "${ES_PWD}"
+  ssl.certificate_authorities:
+    - "/etc/heartbeat/certs/http_ca.crt"
+
+logging.level: info
