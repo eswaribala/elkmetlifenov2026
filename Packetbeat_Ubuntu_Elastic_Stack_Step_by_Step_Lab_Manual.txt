@@ -1,0 +1,762 @@
+PACKETBEAT CONFIGURATION - UBUNTU ELASTIC STACK LAB
+====================================================
+Prepared for: Existing three-node Elasticsearch + separate Kibana/Logstash Ubuntu lab
+Revision: 04 November 2026
+Format: step-by-step trainer / participant manual
+
+GOAL
+----
+Install Packetbeat on one Ubuntu VM, capture network flows and HTTP/DNS/TLS
+metadata, send events DIRECTLY to the existing Elasticsearch cluster,
+and verify them using Kibana Discover and Dev Tools.
+
+IMPORTANT
+---------
+* Packetbeat runs on the Ubuntu machine whose packets you want to observe.
+  It does NOT automatically capture all traffic between the other VMs.
+* Start on the Kibana/Logstash Ubuntu VM (recommended for this exercise) OR
+  repeat the installation on esnode-3 to monitor that VM's network traffic.
+* The three Elasticsearch VMs do not need Packetbeat just to accept events.
+* Packetbeat does not decrypt HTTPS/Elasticsearch TLS payloads. Network flow
+  bytes/packets and TLS handshake metadata are useful; to show HTTP request
+  details, generate unencrypted HTTP test traffic on a controlled lab port.
+* Packetbeat != Metricbeat. Packetbeat captures network events; host CPU and
+  memory monitoring still requires the System integration or Metricbeat.
+* Use only on systems / traffic you are authorized to monitor.
+* This manual uses direct Packetbeat -> Elasticsearch as the PRIMARY path.
+  An optional Packetbeat -> Logstash path is at the end.
+
+LAB TOPOLOGY
+------------
+                    +-------------------------------+
+                    | Ubuntu Kibana/Logstash VM     |
+                    | Packetbeat + HTTP test server |
+                    | (monitors traffic ON this VM) |
+                    +-------------------------------+
+                                   |
+                                   | HTTPS 9200
+                                   v
+                    +-------------------------------+
+                    | Existing Elasticsearch Cluster|
+                    | esnode-1 | esnode-2 | esnode-3|
+                    +-------------------------------+
+                                   |
+                                   v
+                    +-------------------------------+
+                    | Kibana Discover / Dashboards  |
+                    +-------------------------------+
+
+HOSTNAME NOTE: esnode-1 / esnode-2 / esnode-3 are EXAMPLES based on your
+three-node lab. Replace them everywhere with your actual resolvable node
+names or URLs. If your nodes are named es01, node02, node03, use those names.
+The Elasticsearch HTTPS certificate must be valid for the hostnames/IPs
+chosen. Do not disable TLS verification as a normal workaround.
+
+SECTION 1 - CHECK YOUR EXISTING LAB BEFORE INSTALLATION
+-------------------------------------------------------
+1.1. On EACH Elasticsearch VM, confirm Elasticsearch service:
+
+    sudo systemctl status elasticsearch --no-pager
+
+1.2. On the Kibana/Logstash VM:
+
+    sudo systemctl status kibana --no-pager
+    sudo systemctl status logstash --no-pager
+    hostname -f
+    hostname -I
+    ip -br addr
+
+    Logstash may be running for your Filebeat exercises. Packetbeat does NOT
+    require Logstash if the direct Elasticsearch output is selected.
+
+1.3. Check Elasticsearch version on esnode-1:
+
+    /usr/share/elasticsearch/bin/elasticsearch --version
+
+    Or (on the Elasticsearch Ubuntu VM):
+
+    dpkg-query -W elasticsearch
+
+    Record the major version (8.x or 9.x). Install a Packetbeat release
+    compatible with that Elasticsearch version; matching the installed
+    Elastic Stack version is recommended.
+
+1.4. From the future Packetbeat VM, check hostname resolution:
+
+    getent hosts esnode-1
+    getent hosts esnode-2
+    getent hosts esnode-3
+
+    If names do not resolve, use the actual DNS names configured in your
+    environment or carefully add the correct host mappings to /etc/hosts:
+
+    sudo nano /etc/hosts
+
+    EXAMPLE ONLY (do not copy invented addresses):
+      <ES1_IP> esnode-1
+      <ES2_IP> esnode-2
+      <ES3_IP> esnode-3
+
+1.5. Check that the Elasticsearch HTTPS port is reachable:
+
+    nc -vz esnode-1 9200
+    nc -vz esnode-2 9200
+    nc -vz esnode-3 9200
+
+    If 'nc' is missing:
+
+    sudo apt-get update
+    sudo apt-get install -y netcat-openbsd
+
+    You still need a valid CA certificate and credentials for HTTPS access.
+
+SECTION 2 - INSTALL PACKETBEAT ON THE UBUNTU KIBANA/LOGSTASH VM
+---------------------------------------------------------------
+2.1. Prepare required packages:
+
+    sudo apt-get update
+    sudo apt-get install -y curl gnupg ca-certificates
+
+2.2. Configure the signed Elastic APT repository ONLY if it is not already
+     configured for the correct major version.
+
+    First inspect existing Elastic source files:
+
+    grep -R 'artifacts.elastic.co/packages' \
+      /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+
+    Choose ONE version family consistent with your cluster. Example for 9.x:
+
+    ES_MAJOR=9
+
+    For an 8.x cluster, use instead:
+
+    ES_MAJOR=8
+
+    Import the signing key:
+
+    curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | \
+      sudo gpg --dearmor --yes -o /usr/share/keyrings/elasticsearch-keyring.gpg
+
+    Add the appropriate repository only if not already present:
+
+    echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/${ES_MAJOR}.x/apt stable main" | \
+      sudo tee /etc/apt/sources.list.d/elastic-${ES_MAJOR}.x.list
+
+    NOTE: Do not keep conflicting 8.x and 9.x repositories active for a
+    planned matched-version installation. Examine apt policy first.
+
+2.3. Install Packetbeat:
+
+    sudo apt-get update
+    apt-cache policy packetbeat
+    sudo apt-get install -y packetbeat
+
+    Verify version:
+
+    packetbeat version
+    dpkg-query -W packetbeat
+
+    If apt selects an incompatible release, stop and select a compatible
+    package version from the repository; do not blindly install latest.
+
+2.4. Confirm files exist:
+
+    ls -l /etc/packetbeat/packetbeat.yml
+    ls -ld /var/lib/packetbeat
+    systemctl cat packetbeat
+
+SECTION 3 - IDENTIFY THE CAPTURE NETWORK INTERFACE
+---------------------------------------------------
+3.1. List interface names and Packetbeat capture devices:
+
+    ip -br addr
+    sudo packetbeat devices
+
+3.2. For the FIRST training run, use:
+
+    packetbeat.interfaces.device: any
+    packetbeat.interfaces.type: af_packet
+
+    'any' captures traffic to/from the LOCAL Packetbeat VM across Linux
+    interfaces, including loopback test traffic. It is not a network-wide
+    packet mirror. af_packet is a Linux-optimized capture method.
+
+3.3. For advanced labs, change 'any' to an actual interface such as ens33,
+    enp0s3, or eth0. Do not assume a device name without checking 'ip'.
+
+SECTION 4 - COPY / VERIFY THE ELASTICSEARCH HTTPS CA CERTIFICATE
+-----------------------------------------------------------------
+The Packetbeat VM must trust the CA that issued the Elasticsearch HTTP
+certificate used at https://<ES_NODE>:9200.
+
+4.1. On the Packetbeat VM, make a certificates folder:
+
+    sudo install -d -m 0755 /etc/packetbeat/certs
+
+4.2. OPTION A: Your working Logstash has already been configured with the
+     SAME Elasticsearch HTTP CA (example path from the Logstash lab):
+
+    ls -l /usr/share/logstash/certs/ca/ca.crt
+
+    If this file exists and is the correct ES HTTP CA:
+
+    sudo install -m 0644 /usr/share/logstash/certs/ca/ca.crt \
+      /etc/packetbeat/certs/es-http-ca.crt
+
+4.3. OPTION B: Copy the ES HTTP CA from esnode-1.
+     On esnode-1, the package auto-security configuration commonly stores it
+     at /etc/elasticsearch/certs/http_ca.crt. Your custom TLS deployment may
+     use a different path. Find the ACTUAL HTTP CA file first.
+
+    On esnode-1:
+
+    sudo cp /etc/elasticsearch/certs/http_ca.crt /tmp/es-http-ca.crt
+    sudo chmod 0644 /tmp/es-http-ca.crt
+
+    From the Packetbeat VM (replace ubuntu with your actual SSH user):
+
+    scp ubuntu@esnode-1:/tmp/es-http-ca.crt /tmp/es-http-ca.crt
+    sudo install -m 0644 /tmp/es-http-ca.crt \
+      /etc/packetbeat/certs/es-http-ca.crt
+    rm -f /tmp/es-http-ca.crt
+
+    Back on esnode-1:
+
+    sudo rm -f /tmp/es-http-ca.crt
+
+    The copied certificate is public CA data, NOT a private key. Never copy
+    Elasticsearch server private keys to the Packetbeat VM.
+
+4.4. Verify the actual HTTPS endpoint (curl prompts for elastic password):
+
+    curl --cacert /etc/packetbeat/certs/es-http-ca.crt \
+      -u elastic https://esnode-1:9200
+
+    Expected: JSON cluster name, version and tagline after successful login.
+    An authentication error means the CA / connection may work but the
+    credentials were refused. A certificate validation error requires the
+    correct CA and a URL that matches the server certificate.
+
+SECTION 5 - BACK UP AND EDIT PACKETBEAT CONFIGURATION
+------------------------------------------------------
+5.1. Back up the original file:
+
+    sudo cp /etc/packetbeat/packetbeat.yml \
+      /etc/packetbeat/packetbeat.yml.before-lab
+
+5.2. Create a protected Packetbeat keystore for the ES lab password.
+     The DEB systemd service normally runs Packetbeat as root, so use sudo:
+
+    sudo packetbeat keystore create
+    sudo packetbeat keystore add ES_PWD
+
+    When prompted for ES_PWD, enter the working Elasticsearch 'elastic'
+    password used in YOUR LAB. It will NOT appear in packetbeat.yml.
+    The built-in elastic user is acceptable for temporary training setup,
+    but a least-privilege publishing user/API key is preferred in production.
+
+5.3. Edit the configuration:
+
+    sudo nano /etc/packetbeat/packetbeat.yml
+
+    For a first lab, REPLACE the configuration with the following SAMPLE.
+    IMPORTANT: Replace hostnames and Kibana URL to match your environment.
+    This complete example assumes Elasticsearch HTTPS (9200) and Kibana HTTP
+    listening on 127.0.0.1:5601 on the SAME VM as Packetbeat.
+
+--------------------- BEGIN packetbeat.yml ----------------------
+name: packetbeat-ubuntu-lab
+
+tags: ["packetbeat-training", "ubuntu-elastic-lab"]
+
+packetbeat.interfaces.device: any
+packetbeat.interfaces.type: af_packet
+
+packetbeat.flows:
+  enabled: true
+  timeout: 30s
+  period: 10s
+
+packetbeat.protocols:
+  - type: icmp
+    enabled: true
+
+  - type: dns
+    enabled: true
+    ports: [53]
+
+  - type: http
+    enabled: true
+    ports: [80, 8080]
+    send_request: false
+    send_response: false
+
+  - type: tls
+    enabled: true
+    ports: [443, 9200, 9300]
+
+processors:
+  - add_host_metadata: ~
+
+output.elasticsearch:
+  hosts:
+    - "https://esnode-1:9200"
+    - "https://esnode-2:9200"
+    - "https://esnode-3:9200"
+  username: "elastic"
+  password: "${ES_PWD}"
+  ssl.certificate_authorities:
+    - "/etc/packetbeat/certs/es-http-ca.crt"
+
+setup.kibana:
+  host: "http://127.0.0.1:5601"
+  username: "elastic"
+  password: "${ES_PWD}"
+
+logging.level: info
+---------------------- END packetbeat.yml -----------------------
+
+NOTES ON THIS CONFIGURATION
+* Use 'https://' for ES only if your cluster really uses HTTPS; your
+  previous lab appears to use secure HTTPS. Do not guess / mix protocols.
+* If the Kibana service itself uses HTTPS, change setup.kibana.host to its
+  actual https:// URL and configure setup.kibana.ssl.certificate_authorities
+  for Kibana's OWN certificate CA if necessary.
+* If installing Packetbeat on esnode-3 rather than the Kibana VM, point
+  setup.kibana.host to the reachable Kibana VM, not 127.0.0.1.
+* Port 8080 will be used in the test below for unencrypted HTTP.
+* Elasticsearch 9200 and typically transport 9300 use TLS, so they are in
+  the TLS protocol section, NOT the plain HTTP protocol section.
+* If Kibana uses plain HTTP on port 5601 and you want to capture those
+  transactions, add 5601 to the HTTP ports list. If Kibana uses HTTPS,
+  add 5601 to the TLS ports list instead.
+* If you configured another ES HTTP or transport port, adjust ports.
+* Password-free endpoints or custom security require adapted output auth.
+
+5.4. Secure the YAML and verify keystore keys exist:
+
+    sudo chown root:root /etc/packetbeat/packetbeat.yml
+    sudo chmod 0600 /etc/packetbeat/packetbeat.yml
+    sudo packetbeat keystore list
+
+    Expected keystore entry: ES_PWD
+
+SECTION 6 - VALIDATE THE CONFIGURATION AND OUTPUT
+-------------------------------------------------
+6.1. YAML/Packetbeat syntax test:
+
+    sudo packetbeat test config -e
+
+    Expected: Config OK
+
+6.2. Check Packetbeat -> Elasticsearch access:
+
+    sudo packetbeat test output -e
+
+    Expected: successful connection and TLS/auth checks to ES hosts.
+    Resolve any connection / certificate / authentication errors before
+    continuing. If some ES nodes are down, fix their addresses or remove
+    those hosts for the first exercise.
+
+SECTION 7 - INSTALL PACKETBEAT INDEX ASSETS AND KIBANA DASHBOARDS
+-----------------------------------------------------------------
+7.1. Confirm Kibana is accessible on the Packetbeat VM:
+
+    curl -I http://127.0.0.1:5601
+
+    An HTTP response such as 302, 401, or 200 means the port is responding;
+    'connection refused' means the URL/port/service must be corrected.
+
+7.2. Run the setup command ONCE for this Elastic Stack version:
+
+    sudo packetbeat setup -e
+
+    This loads the appropriate Elasticsearch index management assets and
+    available Kibana visualizations. The 'elastic' training account has
+    setup permissions. The runtime publishing account can be more limited.
+
+7.3. If setup fails:
+    - 401: wrong credentials.
+    - 403: user lacks setup permissions.
+    - x509: CA or TLS hostname issue.
+    - cannot reach 5601: wrong Kibana URL or Kibana not running.
+    - incompatible version: verify Packetbeat / Stack compatibility.
+
+SECTION 8 - START AND VERIFY PACKETBEAT SERVICE
+-----------------------------------------------
+8.1. Enable and start:
+
+    sudo systemctl enable --now packetbeat
+
+8.2. Confirm service:
+
+    sudo systemctl status packetbeat --no-pager
+    sudo systemctl is-active packetbeat
+
+    Expected: active
+
+8.3. Watch service logs:
+
+    sudo journalctl -u packetbeat -n 100 --no-pager
+    sudo journalctl -u packetbeat -f
+
+    Press Ctrl+C to stop following the log; the Packetbeat service keeps
+    running in the background under systemd.
+
+SECTION 9 - LAB 1: GENERATE AN HTTP TRANSACTION ON THE LOCAL UBUNTU VM
+------------------------------------------------------------------------
+Purpose: Demonstrate the HTTP protocol parser on traffic Packetbeat can
+actually see. This is the most reliable beginner exercise.
+
+9.1. In Terminal 1 on the Packetbeat Ubuntu VM, start a local lab HTTP
+     server on port 8080:
+
+    mkdir -p ~/packetbeat-http-test
+    echo 'Packetbeat HTTP capture test OK' > ~/packetbeat-http-test/index.html
+    cd ~/packetbeat-http-test
+    python3 -m http.server 8080 --bind 127.0.0.1
+
+    Keep Terminal 1 running.
+
+9.2. In Terminal 2 on that SAME VM, create requests:
+
+    curl -v http://127.0.0.1:8080/
+    curl -I http://127.0.0.1:8080/
+    curl http://127.0.0.1:8080/index.html
+    curl http://127.0.0.1:8080/does-not-exist
+
+    Expect responses including 200 and 404.
+    Packetbeat must be running and listening via 'any' during this test.
+
+9.3. In Kibana Discover, search for relevant HTTP documents:
+
+    event.dataset: "http"
+
+    Or use:
+
+    destination.port: 8080 or source.port: 8080
+
+    Observe @timestamp, source.ip, destination.ip, destination.port,
+    http.request.method, http.response.status_code, event.dataset and
+    event.duration (fields depend on your Packetbeat version/event).
+
+9.4. Evidence E1: Screenshot of one HTTP event with timestamp, port 8080,
+     method and status code, if exported by the running version.
+
+9.5. Stop the Python HTTP server using Ctrl+C in Terminal 1.
+
+SECTION 10 - LAB 2: GENERATE / VERIFY NETWORK FLOW EVENTS
+----------------------------------------------------------
+10.1. Generate traffic from the Packetbeat VM to ES:
+
+    curl --cacert /etc/packetbeat/certs/es-http-ca.crt \
+      -u elastic https://esnode-1:9200/_cluster/health?pretty
+
+    If preferred, generate HTTP test traffic again on port 8080.
+
+10.2. After at least 10-30 seconds, Kibana Discover query:
+
+    event.dataset: "flow"
+
+10.3. Inspect source.ip, destination.ip, source.port, destination.port,
+      network.bytes, network.packets, network.transport, flow.final.
+
+10.4. Flow metrics may be cumulative intermediate snapshots. For a final
+      per-flow summary, filter flow.final: true and allow for the timeout.
+
+10.5. Evidence E2: One flow event showing source/destination and bytes.
+
+SECTION 11 - LAB 3: GENERATE AND INSPECT TLS HANDSHAKE METADATA
+---------------------------------------------------------------
+11.1. Generate a fresh HTTPS connection from the monitored VM:
+
+    curl --cacert /etc/packetbeat/certs/es-http-ca.crt \
+      -u elastic https://esnode-1:9200/
+
+11.2. In Discover query:
+
+    event.dataset: "tls"
+
+    Alternatively try filtering:
+
+    destination.port: 9200
+
+11.3. Inspect populated TLS fields such as tls.version,
+      tls.cipher, server/certificate metadata as available.
+
+11.4. Important: You will NOT see decrypted Elasticsearch JSON API
+      request/response bodies from TLS traffic. Packetbeat does not decrypt
+      TLS payloads. A TLS event requires observing a relevant handshake.
+
+11.5. Evidence E3: One TLS handshake event showing the relevant destination
+      port and TLS metadata, if captured.
+
+SECTION 12 - LAB 4: OPTIONAL DNS AND ICMP
+-----------------------------------------
+12.1. Install DNS query tool if needed:
+
+    sudo apt-get install -y dnsutils
+
+12.2. Send a DNS query to an approved / reachable DNS resolver; for example,
+      substitute YOUR resolver IP in this command:
+
+    dig @<DNS_SERVER_IP> example.org
+
+    Confirm Packetbeat is capturing the interface that carries DNS traffic.
+    Note that local caches, encrypted DNS and restricted networks may mean
+    that no UDP/TCP port 53 packet is visible.
+
+12.3. For ICMP, if your network allows it:
+
+    ping -c 3 esnode-1
+
+12.4. Kibana Discover queries:
+
+    event.dataset: "dns"
+
+    or:
+
+    event.dataset: "icmp"
+
+12.5. Evidence E4: DNS question/answer or ICMP event if the test is allowed.
+
+SECTION 13 - VERIFY RESULTS IN KIBANA
+-------------------------------------
+13.1. Open your existing Kibana URL in a browser.
+
+13.2. Use Kibana > Discover. If there is no Packetbeat data view:
+      Stack Management > Data Views > Create data view
+
+      Name: Packetbeat Lab
+      Index pattern: packetbeat-*
+      Timestamp field: @timestamp
+
+      If your Packetbeat installation is configured to write to a different
+      index/alias/data stream, use its actual matching pattern instead.
+
+13.3. Set the time filter to Last 15 minutes or Last 30 minutes.
+
+13.4. Suggested KQL queries to run ONE AT A TIME:
+
+      event.dataset: "http"
+      event.dataset: "flow"
+      event.dataset: "tls"
+      destination.port: 8080
+      tags: "packetbeat-training"
+
+13.5. Add helpful columns as available:
+
+      @timestamp
+      event.dataset
+      source.ip
+      destination.ip
+      source.port
+      destination.port
+      network.bytes
+      http.request.method
+      http.response.status_code
+      tls.version
+
+13.6. In Analytics > Dashboards, search for Packetbeat. Prebuilt dashboard
+      names and availability depend on your version and asset setup.
+
+SECTION 14 - VERIFY RESULTS IN KIBANA DEV TOOLS
+-----------------------------------------------
+Open: Kibana > Dev Tools > Console
+
+Run requests separately:
+
+    GET _cat/indices/packetbeat*?v
+
+    GET _data_stream/packetbeat*
+
+    GET packetbeat-*/_search
+    {
+      "size": 5,
+      "sort": [ { "@timestamp": { "order": "desc" } } ]
+    }
+
+    GET packetbeat-*/_count
+
+    GET packetbeat-*/_search
+    {
+      "size": 10,
+      "query": {
+        "term": { "event.dataset": "http" }
+      },
+      "sort": [ { "@timestamp": { "order": "desc" } } ]
+    }
+
+If a requested resource does not exist, a 404 is possible. Inspect the
+actual index/data stream names with these commands instead of assuming the
+index shape. Data stream backing indices may be hidden in _cat output.
+
+SECTION 15 - TROUBLESHOOTING CHECKLIST
+--------------------------------------
+PROBLEM A: Packetbeat does not start
+  sudo packetbeat test config -e
+  sudo journalctl -u packetbeat -n 100 --no-pager
+  Check YAML indentation, permissions, keystore and interface type.
+
+PROBLEM B: Failed to connect to Elasticsearch
+  sudo packetbeat test output -e
+  nc -vz esnode-1 9200
+  Check DNS/hosts, firewall, port 9200, TLS CA and authentication.
+
+PROBLEM C: x509 certificate verification / hostname mismatch
+  Use the real ES HTTP CA. Make sure output host matches certificate SAN.
+  Do not fix a certificate problem with ssl.verification_mode: none.
+
+PROBLEM D: 401 unauthorized / 403 forbidden
+  Check keystore password and required setup / publish privileges.
+  For production, create separate users / API keys with minimum privileges.
+
+PROBLEM E: Packetbeat service is active but Discover is empty
+  1. Check the Kibana time range (Last 30 minutes).
+  2. Confirm Packetbeat data view matches the ACTUAL index/data stream.
+  3. Run sudo journalctl -u packetbeat -n 100 --no-pager.
+  4. Generate fresh port-8080 HTTP traffic on the SAME Packetbeat VM.
+  5. Confirm the capture interface, 'any', and af_packet capability.
+  6. Check sudo packetbeat test output -e.
+  7. Search packetbeat-* without a KQL filter first.
+
+PROBLEM F: Flow records exist but no HTTP request records
+  Expected if all observed traffic is TLS/HTTPS, or HTTP traffic is on an
+  unconfigured port, or the listener is on a different machine.
+  Use the local Python port-8080 HTTP test in Section 9.
+
+PROBLEM G: TLS record absent
+  Generate a NEW connection/handshake after Packetbeat is running.
+  Check that TLS ports include the actual service port and that traffic
+  crosses the Packetbeat host's captured interfaces.
+
+PROBLEM H: Kibana dashboards are missing
+  sudo packetbeat setup -e
+  Check Kibana URL, credentials, Stack / Beat versions, and setup logs.
+
+PROBLEM I: Packetbeat is installed on Kibana VM but esnode-2->esnode-3
+traffic is not visible
+  This is normal. Packetbeat sees traffic at its own sensor location.
+  Install an additional Packetbeat on the target node or use an authorized
+  network mirroring mechanism for dedicated packet monitoring.
+
+SECTION 16 - OPTIONAL ALTERNATIVE: PACKETBEAT -> LOGSTASH -> ELASTICSEARCH
+-------------------------------------------------------------------------
+Use ONLY if you specifically want to reuse the Logstash pipeline design
+from the earlier Filebeat/Logstash training. Direct ES is easier for the
+first Packetbeat lab.
+
+16.1. On the Logstash VM, add a separate Beats input on port 5045.
+      Do NOT change your working Filebeat input on port 5044.
+
+      Example Logstash pipeline INPUT ONLY:
+
+      input {
+        beats {
+          port => 5045
+        }
+      }
+
+      For the output, REUSE the WORKING Elasticsearch output settings from
+      your current Logstash lab (HTTPS hosts, CA, credentials and index).
+      If you write to an explicit traditional index, choose a Packetbeat-
+      specific index such as packetbeat-lab-%{+YYYY.MM.dd}, with
+      data_stream => false where your pipeline requires it.
+      Do not paste the input-only snippet as a complete pipeline and expect
+      it to index data: Logstash must also have an Elasticsearch output.
+
+16.2. Validate Logstash pipeline using your existing configuration layout,
+      then restart Logstash and confirm the Beats input is listening:
+
+      sudo systemctl restart logstash
+      sudo systemctl status logstash --no-pager
+      sudo ss -lntp | grep ':5045'
+
+      If your Logstash uses separate pipelines.yml entries, place the new
+      Beats input and its output in the correct pipeline file. Avoid adding
+      duplicate inputs or mixing two unrelated lab outputs unintentionally.
+
+16.3. On the Packetbeat VM, back up packetbeat.yml and EDIT its output:
+      COMMENT OUT or REMOVE the whole output.elasticsearch block;
+      activate this INSTEAD:
+
+      output.logstash:
+        hosts: ["<LOGSTASH_VM_IP_OR_NAME>:5045"]
+
+      Only ONE Packetbeat output may be active at a time.
+
+16.4. Since dashboard/index management setup requires Elasticsearch,
+      complete the direct-ES 'sudo packetbeat setup -e' step BEFORE changing
+      to Logstash output, or temporarily override the output when setting up.
+
+16.5. Validate and restart Packetbeat:
+
+      sudo packetbeat test config -e
+      sudo packetbeat test output -e
+      sudo systemctl restart packetbeat
+
+      Look for your actual Logstash destination index in Kibana and create
+      a matching data view. For the optional example above: packetbeat-lab-*
+      Verify both Logstash and Packetbeat logs if events do not arrive.
+
+SECTION 17 - LAB COMPLETION / TRAINER EVIDENCE
+----------------------------------------------
+[ ] E0 - packetbeat version and systemctl active status
+[ ] E1 - Kibana HTTP transaction on port 8080 (200 or 404)
+[ ] E2 - Network flow with source/destination IP, port and byte count
+[ ] E3 - TLS handshake metadata for Elasticsearch HTTPS 9200, if captured
+[ ] E4 - Optional DNS or ICMP event
+[ ] E5 - Kibana Discover view using packetbeat-* and Last 30 minutes
+[ ] E6 - Kibana Dev Tools query returning Packetbeat documents
+
+Suggested learner questions:
+  Q1. How is Packetbeat different from Filebeat and Metricbeat?
+  Q2. Why can Packetbeat monitor TLS metadata but not HTTPS request bodies?
+  Q3. Why does a sensor on Kibana VM not see all traffic between ES nodes?
+  Q4. What is the difference between a network flow and an HTTP transaction?
+  Q5. Why must the Packetbeat Elasticsearch output trust the ES CA?
+
+SECTION 18 - STOP / UNDO THE LAB (OPTIONAL)
+------------------------------------------
+Stop Packetbeat only (does not uninstall):
+
+    sudo systemctl stop packetbeat
+
+Restart later:
+
+    sudo systemctl start packetbeat
+
+Disable automatic startup:
+
+    sudo systemctl disable packetbeat
+
+Restore your original config if necessary:
+
+    sudo cp /etc/packetbeat/packetbeat.yml.before-lab \
+      /etc/packetbeat/packetbeat.yml
+    sudo chown root:root /etc/packetbeat/packetbeat.yml
+    sudo chmod 0600 /etc/packetbeat/packetbeat.yml
+    sudo packetbeat test config -e
+
+Do not delete Elasticsearch data, index templates or Kibana assets as part
+of the beginner training cleanup unless you understand what they contain.
+
+OFFICIAL DOCUMENTATION / REFERENCES
+-----------------------------------
+Install/configure:
+https://www.elastic.co/docs/reference/beats/packetbeat/packetbeat-installation-configuration
+APT repository:
+https://www.elastic.co/docs/reference/beats/packetbeat/setup-repositories
+Elasticsearch output:
+https://www.elastic.co/docs/reference/beats/packetbeat/elasticsearch-output
+Keystore:
+https://www.elastic.co/docs/reference/beats/packetbeat/keystore
+Flows:
+https://www.elastic.co/docs/reference/beats/packetbeat/configuration-flows
+TLS capture:
+https://www.elastic.co/docs/reference/beats/packetbeat/configuration-tls
+Logstash output:
+https://www.elastic.co/docs/reference/beats/packetbeat/logstash-output
+
+END OF MANUAL
