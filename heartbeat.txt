@@ -1,0 +1,34 @@
+heartbeat.monitors:
+  - type: http
+    id: kibana-vm-http-lab
+    name: Kibana VM - HTTP Lab 8088
+    schedule: '@every 10s'
+    hosts: ["http://127.0.0.1:8088/"]
+    check.response:
+      status: [200]
+      body:
+        positive: ["HEARTBEAT LAB OK"]
+
+  - type: tcp
+    id: kibana-vm-tcp-5601
+    name: Kibana VM - TCP 5601
+    schedule: '@every 10s'
+    hosts: ["127.0.0.1:5601"]
+
+  - type: tcp
+    id: esnode1-tcp-9200
+    name: Elasticsearch node1 - TCP 9200
+    schedule: '@every 10s'
+    hosts: ["ESNODE1_NAME:9200"]
+
+  - type: icmp
+    id: kibana-vm-icmp-local
+    name: Kibana VM - ICMP Loopback
+    schedule: '@every 10s'
+    hosts: ["127.0.0.1"]
+
+  - type: icmp
+    id: esnode1-icmp
+    name: Elasticsearch node1 - ICMP
+    schedule: '@every 10s'
+    hosts: ["ESNODE1_NAME"]
