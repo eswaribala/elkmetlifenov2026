@@ -1,0 +1,1442 @@
+[
+  {
+    "@timestamp": "2026-11-06T06:36:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 201
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0001"
+    },
+    "response_time_ms": 118
+  },
+  {
+    "@timestamp": "2026-11-06T06:37:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0002"
+    },
+    "response_time_ms": 191
+  },
+  {
+    "@timestamp": "2026-11-06T06:38:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0003"
+    },
+    "response_time_ms": 264
+  },
+  {
+    "@timestamp": "2026-11-06T06:39:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0004"
+    },
+    "response_time_ms": 337
+  },
+  {
+    "@timestamp": "2026-11-06T06:40:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0005"
+    },
+    "response_time_ms": 410
+  },
+  {
+    "@timestamp": "2026-11-06T06:41:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0006"
+    },
+    "response_time_ms": 483
+  },
+  {
+    "@timestamp": "2026-11-06T06:42:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0007"
+    },
+    "response_time_ms": 96
+  },
+  {
+    "@timestamp": "2026-11-06T06:43:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "WARN"
+    },
+    "http": {
+      "response": {
+        "status_code": 400
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0008"
+    },
+    "response_time_ms": 748
+  },
+  {
+    "@timestamp": "2026-11-06T06:44:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 500
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0009"
+    },
+    "response_time_ms": 4373
+  },
+  {
+    "@timestamp": "2026-11-06T06:45:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0010"
+    },
+    "response_time_ms": 315
+  },
+  {
+    "@timestamp": "2026-11-06T06:46:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0011"
+    },
+    "response_time_ms": 388
+  },
+  {
+    "@timestamp": "2026-11-06T06:47:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0012"
+    },
+    "response_time_ms": 461
+  },
+  {
+    "@timestamp": "2026-11-06T06:48:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0013"
+    },
+    "response_time_ms": 74
+  },
+  {
+    "@timestamp": "2026-11-06T06:49:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0014"
+    },
+    "response_time_ms": 147
+  },
+  {
+    "@timestamp": "2026-11-06T06:50:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 502
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0015"
+    },
+    "response_time_ms": 4955
+  },
+  {
+    "@timestamp": "2026-11-06T06:51:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0016"
+    },
+    "response_time_ms": 293
+  },
+  {
+    "@timestamp": "2026-11-06T06:52:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0017"
+    },
+    "response_time_ms": 366
+  },
+  {
+    "@timestamp": "2026-11-06T06:53:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0018"
+    },
+    "response_time_ms": 439
+  },
+  {
+    "@timestamp": "2026-11-06T06:54:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0019"
+    },
+    "response_time_ms": 52
+  },
+  {
+    "@timestamp": "2026-11-06T06:55:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0020"
+    },
+    "response_time_ms": 125
+  },
+  {
+    "@timestamp": "2026-11-06T06:56:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 503
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0021"
+    },
+    "response_time_ms": 5537
+  },
+  {
+    "@timestamp": "2026-11-06T06:57:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "WARN"
+    },
+    "http": {
+      "response": {
+        "status_code": 401
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0022"
+    },
+    "response_time_ms": 892
+  },
+  {
+    "@timestamp": "2026-11-06T06:58:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0023"
+    },
+    "response_time_ms": 344
+  },
+  {
+    "@timestamp": "2026-11-06T06:59:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0024"
+    },
+    "response_time_ms": 417
+  },
+  {
+    "@timestamp": "2026-11-06T07:00:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0025"
+    },
+    "response_time_ms": 490
+  },
+  {
+    "@timestamp": "2026-11-06T07:01:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0026"
+    },
+    "response_time_ms": 103
+  },
+  {
+    "@timestamp": "2026-11-06T07:02:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 500
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0027"
+    },
+    "response_time_ms": 3819
+  },
+  {
+    "@timestamp": "2026-11-06T07:03:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0028"
+    },
+    "response_time_ms": 249
+  },
+  {
+    "@timestamp": "2026-11-06T07:04:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 201
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0029"
+    },
+    "response_time_ms": 322
+  },
+  {
+    "@timestamp": "2026-11-06T07:05:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0030"
+    },
+    "response_time_ms": 395
+  },
+  {
+    "@timestamp": "2026-11-06T07:06:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0031"
+    },
+    "response_time_ms": 468
+  },
+  {
+    "@timestamp": "2026-11-06T07:07:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0032"
+    },
+    "response_time_ms": 81
+  },
+  {
+    "@timestamp": "2026-11-06T07:08:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 503
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0033"
+    },
+    "response_time_ms": 4401
+  },
+  {
+    "@timestamp": "2026-11-06T07:09:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 500
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0034"
+    },
+    "response_time_ms": 4498
+  },
+  {
+    "@timestamp": "2026-11-06T07:10:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0035"
+    },
+    "response_time_ms": 300
+  },
+  {
+    "@timestamp": "2026-11-06T07:11:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 201
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0036"
+    },
+    "response_time_ms": 373
+  },
+  {
+    "@timestamp": "2026-11-06T07:12:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "WARN"
+    },
+    "http": {
+      "response": {
+        "status_code": 404
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0037"
+    },
+    "response_time_ms": 257
+  },
+  {
+    "@timestamp": "2026-11-06T07:13:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0038"
+    },
+    "response_time_ms": 59
+  },
+  {
+    "@timestamp": "2026-11-06T07:14:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0039"
+    },
+    "response_time_ms": 132
+  },
+  {
+    "@timestamp": "2026-11-06T07:15:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0040"
+    },
+    "response_time_ms": 205
+  },
+  {
+    "@timestamp": "2026-11-06T07:16:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 502
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0041"
+    },
+    "response_time_ms": 5177
+  },
+  {
+    "@timestamp": "2026-11-06T07:17:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0042"
+    },
+    "response_time_ms": 351
+  },
+  {
+    "@timestamp": "2026-11-06T07:18:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 201
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0043"
+    },
+    "response_time_ms": 424
+  },
+  {
+    "@timestamp": "2026-11-06T07:19:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0044"
+    },
+    "response_time_ms": 497
+  },
+  {
+    "@timestamp": "2026-11-06T07:20:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0045"
+    },
+    "response_time_ms": 110
+  },
+  {
+    "@timestamp": "2026-11-06T07:21:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0046"
+    },
+    "response_time_ms": 183
+  },
+  {
+    "@timestamp": "2026-11-06T07:22:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0047"
+    },
+    "response_time_ms": 256
+  },
+  {
+    "@timestamp": "2026-11-06T07:23:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 504
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0048"
+    },
+    "response_time_ms": 3556
+  },
+  {
+    "@timestamp": "2026-11-06T07:24:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0049"
+    },
+    "response_time_ms": 402
+  },
+  {
+    "@timestamp": "2026-11-06T07:25:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 201
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0050"
+    },
+    "response_time_ms": 475
+  },
+  {
+    "@timestamp": "2026-11-06T07:26:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0051"
+    },
+    "response_time_ms": 88
+  },
+  {
+    "@timestamp": "2026-11-06T07:27:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0052"
+    },
+    "response_time_ms": 161
+  },
+  {
+    "@timestamp": "2026-11-06T07:28:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0053"
+    },
+    "response_time_ms": 234
+  },
+  {
+    "@timestamp": "2026-11-06T07:29:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0054"
+    },
+    "response_time_ms": 307
+  },
+  {
+    "@timestamp": "2026-11-06T07:30:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "ERROR"
+    },
+    "http": {
+      "response": {
+        "status_code": 500
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0055"
+    },
+    "response_time_ms": 4235
+  },
+  {
+    "@timestamp": "2026-11-06T07:31:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0056"
+    },
+    "response_time_ms": 453
+  },
+  {
+    "@timestamp": "2026-11-06T07:32:00Z",
+    "service": {
+      "name": "checkout-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 201
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0057"
+    },
+    "response_time_ms": 66
+  },
+  {
+    "@timestamp": "2026-11-06T07:33:00Z",
+    "service": {
+      "name": "payment-api"
+    },
+    "host": {
+      "name": "app-node-1"
+    },
+    "event": {
+      "outcome": "failure"
+    },
+    "log": {
+      "level": "WARN"
+    },
+    "http": {
+      "response": {
+        "status_code": 429
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0058"
+    },
+    "response_time_ms": 898
+  },
+  {
+    "@timestamp": "2026-11-06T07:34:00Z",
+    "service": {
+      "name": "auth-api"
+    },
+    "host": {
+      "name": "app-node-2"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0059"
+    },
+    "response_time_ms": 212
+  },
+  {
+    "@timestamp": "2026-11-06T07:35:00Z",
+    "service": {
+      "name": "inventory-api"
+    },
+    "host": {
+      "name": "app-node-3"
+    },
+    "event": {
+      "outcome": "success"
+    },
+    "log": {
+      "level": "INFO"
+    },
+    "http": {
+      "response": {
+        "status_code": 200
+      }
+    },
+    "trace": {
+      "id": "trace-inc-0060"
+    },
+    "response_time_ms": 285
+  }
+]
