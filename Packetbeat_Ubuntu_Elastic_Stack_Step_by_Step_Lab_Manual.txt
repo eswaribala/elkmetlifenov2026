@@ -425,6 +425,10 @@ SECTION 8 - START AND VERIFY PACKETBEAT SERVICE
     running in the background under systemd.
 
 #test with postgresql
+#Set password
+sudo -U postgres psql
+#\password postgres
+
 PGSSLMODE=disable psql -h 127.0.0.1 -p 5432 -U postgres -d testdb -W
 or
 psql "host=127.0.0.1 port=5432 user=postgres dbname=testdb sslmode=disable"
