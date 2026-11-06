@@ -1,0 +1,205 @@
+Step 1: Check Ubuntu version
+Open the Ubuntu terminal and execute:
+lsb_release -a
+
+
+Check whether PostgreSQL is already installed:
+psql --version
+
+
+If PostgreSQL is not installed, continue.
+Step 2: Update Ubuntu packages
+sudo apt update
+
+
+Step 3: Install PostgreSQL
+sudo apt install postgresql postgresql-contrib -y
+
+
+This installs the PostgreSQL database server and additional utilities. The default PostgreSQL version depends on your Ubuntu release. 
+PostgreSQL+1
+
+Step 4: Start PostgreSQL service
+sudo systemctl start postgresql
+
+
+Enable automatic startup:
+sudo systemctl enable postgresql
+
+
+Verify status:
+sudo systemctl status postgresql
+
+
+Expected output:
+Active: active (exited)
+
+
+On Ubuntu, postgresql.service may show active (exited) because it is a wrapper service. Check the actual database cluster:
+pg_lsclusters
+
+
+Expected:
+Ver Cluster Port Status Owner
+16  main    5432 online postgres
+
+
+The version may differ.
+Step 5: Login to PostgreSQL
+sudo -u postgres psql
+
+
+Expected prompt:
+postgres=#
+
+
+Check version:
+SELECT version();
+
+
+List databases:
+\l
+
+
+List users:
+\du
+
+
+Exit:
+\q
+
+
+Step 6: Set PostgreSQL password
+Login:
+sudo -u postgres psql
+
+
+Run:
+\password postgres
+
+
+Enter and confirm a strong password when prompted.
+
+Exit:
+\q
+
+
+Step 7: Create a lab database
+Login:
+sudo -u postgres psql
+
+
+Create database:
+CREATE DATABASE labdb;
+
+
+Create user:
+CREATE USER labuser WITH PASSWORD 'ChangeThisStrongPassword!';
+
+
+Grant access:
+GRANT ALL PRIVILEGES ON DATABASE labdb TO labuser;
+
+
+Connect to the database:
+\c labdb
+
+
+Allow the lab user to create tables in the public schema:
+GRANT USAGE, CREATE ON SCHEMA public TO labuser;
+
+
+Exit:
+\q
+
+
+Step 8: Test database connectivity
+From the Ubuntu terminal:
+psql -h 127.0.0.1 -p 5432 -U labuser -d labdb
+
+
+Enter the password.
+
+Expected:
+labdb=>
+
+
+Create a sample table:
+CREATE TABLE employees (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    department VARCHAR(50)
+);
+
+
+Insert test data:
+INSERT INTO employees (name, department)
+VALUES ('Ravi', 'IT');
+
+
+Verify:
+SELECT * FROM employees;
+
+
+Expected result:
+ id | name | department
+----+------+------------
+  1 | Ravi | IT
+
+
+Step 9: Locate and open PostgreSQL configuration
+Find the installed version:
+pg_lsclusters
+
+
+The configuration directory is:
+/etc/postgresql/<version>/main/
+
+
+For example, if your version is 16:
+sudo nano /etc/postgresql/16/main/postgresql.conf
+
+
+For your actual version, use:
+sudo -u postgres psql -tAc "SHOW config_file;"
+
+
+The important files are:
+File	Purpose
+postgresql.conf	Server settings, ports, network
+pg_hba.conf	Client authentication and access
+pg_ident.conf	Username mapping
+
+Ubuntu documents these configuration locations and authentication settings. 
+Ubuntu Server documentation
+
+Step 10: Configure PostgreSQL network access
+For a local lab, leave this setting as:
+listen_addresses = 'localhost'
+port = 5432
+
+
+If you need Packetbeat or another VM to reach PostgreSQL over the network, set listen_addresses to the PostgreSQL VM's private IP address and add a restricted client entry in pg_hba.conf:
+host  labdb  labuser  192.168.1.50/32  scram-sha-256
+
+
+Replace 192.168.1.50 with the authorized client VM address. Do not expose port 5432 publicly.
+
+Restart PostgreSQL if you changed the configuration:
+sudo systemctl restart postgresql
+
+
+Step 11: Verify PostgreSQL port
+sudo ss -lntp | grep 5432
+
+
+Expected:
+LISTEN ... 127.0.0.1:5432
+
+
+Check database readiness:
+pg_isready -h 127.0.0.1 -p 5432
+
+
+Expected:
+127.0.0.1:5432 - accepting connections
