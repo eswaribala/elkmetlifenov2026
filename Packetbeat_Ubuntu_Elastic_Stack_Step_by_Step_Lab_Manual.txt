@@ -424,6 +424,16 @@ SECTION 8 - START AND VERIFY PACKETBEAT SERVICE
     Press Ctrl+C to stop following the log; the Packetbeat service keeps
     running in the background under systemd.
 
+#test with postgresql
+PGSSLMODE=disable psql -h 127.0.0.1 -p 5432 -U postgres -d testdb -W
+or
+psql "host=127.0.0.1 port=5432 user=postgres dbname=testdb sslmode=disable"
+SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid();
+select now();
+select version();
+#in another terminal 
+sudo tcpdump -i lo -nn -s 0 tcp port 5432
+
 SECTION 9 - LAB 1: GENERATE AN HTTP TRANSACTION ON THE LOCAL UBUNTU VM
 ------------------------------------------------------------------------
 Purpose: Demonstrate the HTTP protocol parser on traffic Packetbeat can
